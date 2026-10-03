@@ -1,0 +1,2535 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>HKSBC 羽毛球活動編排</title>
+<!-- PWA：加入主畫面後變成全螢幕「App」，並支援離線快取（見 service-worker.js）。
+     呢啲標籤喺 Claude Artifact 入面會被忽略，唔影響網上版；只有喺自行架設嘅網站
+     （例如 GitHub Pages）先會生效。 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8865F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HKSBC">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root {
+  --bg: #FFF3E9; --surface: #FFFDFB; --primary: #E8865F; --text: #3A3A3A; --muted: #8F7B6E; --danger: #D9564A; --border: #F0DCC9;
+  --gA: #E8865F; --gB: #3F8F8B; --gC: #4E9F5E; --male: #3B7DD8; --female: #E85D75; --ok: #4E9F5E;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #2B2320; --surface: #362C27; --primary: #F2A47D; --text: #FBEEE5; --muted: #C2A392; --danger: #E88F84; --border: #4A3B32;
+    --gA: #F2A47D; --gB: #6CC0BB; --gC: #7CC38B; --male: #6FA3EE; --female: #F08A9D; --ok: #7CC38B;
+  }
+}
+/* 管理員 MODE：全個畫面底色轉做深淺藍色系（唔會影響上面 A/B/C/男女等固定顏色），
+   等使用者一望就知而家係咪處於管理員模式，唔會同平時（只留喺球場頁）嘅畫面搞亂。 */
+body.admin-on {
+  --bg: #E3EEFC; --surface: #F3F8FF; --border: #BBD4F5; --primary: #2E63C9;
+}
+@media (prefers-color-scheme: dark) {
+  body.admin-on {
+    --bg: #16233A; --surface: #1F3352; --border: #35507E; --primary: #7FAEFA;
+  }
+}
+.admin-banner { display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 13px;
+  letter-spacing: .5px; color: #fff; background: var(--primary); border-radius: 12px; padding: 6px 10px; margin: 0 0 10px; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang HK", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+.app { max-width: 1000px; margin: 0 auto; min-height: 100vh; padding-bottom: 40px; }
+.header { position: sticky; top: 0; background: var(--bg); padding: 14px 16px 0; z-index: 5; }
+.title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.title { font-weight: 800; font-size: 20px; color: var(--primary); }
+.badge-top { font-size: 12px; font-weight: 700; color: var(--bg); background: var(--text); padding: 4px 12px; border-radius: 999px; }
+.tabs { display: flex; gap: 4px; background: var(--border); padding: 4px; border-radius: 22px; }
+.tab { flex: 1; border: none; background: transparent; padding: 9px 0; font: inherit; font-size: 14px; font-weight: 700; color: var(--muted); border-radius: 16px; cursor: pointer; }
+.tab.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.view { padding: 16px; }
+.hint { color: var(--muted); font-size: 14px; text-align: center; padding: 18px 8px; line-height: 1.6; }
+
+.btn { font: inherit; font-weight: 700; font-size: 14px; border: none; border-radius: 14px; padding: 10px 16px; cursor: pointer; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.ws-toggle { color: #fff; font-weight: 700; border: none; }
+.ws-toggle.ws-off { background: var(--danger); }
+.ws-toggle.ws-on { background: var(--ok); }
+.ci-toggle { color: #fff; font-weight: 700; border: none; }
+.ci-toggle.ci-out { background: var(--ok); }
+.ci-toggle.ci-in { background: var(--danger); }
+.btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 12px; }
+
+.cols { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 860px) { .cols { grid-template-columns: 1.5fr 1fr; align-items: start; } }
+.courts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (max-width: 640px) { .courts { grid-template-columns: 1fr; } }
+.queue-flow { display: flex; flex-wrap: wrap; gap: 10px; }
+.panel-title { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; margin: 0 0 10px; }
+.court { background: var(--surface); border-radius: 20px; padding: 14px; border-left: 5px solid var(--primary); }
+.court.tA { border-left-color: var(--gA); }
+.court.tB { border-left-color: var(--gB); }
+.court.tC { border-left-color: var(--gC); }
+.court.tF { border-left-color: var(--female); }
+.court.idle { opacity: .85; }
+.court-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px; }
+.court-label { font-weight: 800; font-size: 14px; }
+.tags { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--bg); color: var(--primary); }
+.tag.ws { background: var(--primary); color: #fff; }
+.tag.tA { background: var(--gA); color: #fff; } .tag.tB { background: var(--gB); color: #fff; } .tag.tC { background: var(--gC); color: #fff; } .tag.tF { background: var(--female); color: #fff; }
+.team { width: 100%; text-align: left; background: var(--bg); border: 2px solid var(--border); border-radius: 14px; padding: 10px 12px; color: var(--text); font: inherit; display: block; }
+.team-row-flex { display: flex; align-items: center; gap: 8px; }
+.team-info { flex: 1; min-width: 0; }
+.win-icon-btn { flex: none; width: 42px; height: 42px; border-radius: 12px; border: none; background: var(--primary); color: #fff; font-size: 19px; cursor: pointer; }
+.vs { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding: 4px 0; }
+.court-actions { display: flex; justify-content: space-between; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.next-up { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.pc { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 600; margin: 2px 10px 2px 0; }
+.pc small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.pc.gM .nm { border-bottom: 2px solid var(--male); }
+.pc.gF .nm { border-bottom: 2px solid var(--female); }
+.pc-btn { border: 1px dashed var(--muted); background: var(--surface); color: var(--text); border-radius: 10px; padding: 3px 8px; margin: 3px 6px 3px 0; cursor: pointer; font: inherit; }
+.pc-btn .pc { margin: 0; }
+.gr { font-style: normal; font-size: 10px; font-weight: 800; color: #fff; border-radius: 6px; padding: 1px 5px; }
+.gr.A { background: var(--gA); } .gr.B { background: var(--gB); } .gr.C { background: var(--gC); } .gr.F { background: var(--female); }
+.mx { font-style: normal; font-size: 10px; font-weight: 800; border-radius: 6px; padding: 1px 5px; border: 1px solid var(--muted); color: var(--muted); }
+
+.card { background: var(--surface); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+.q-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; flex: 1 1 250px; }
+.q-no { width: 22px; text-align: center; font-weight: 800; color: var(--muted); font-size: 13px; }
+.q-main { flex: 1; min-width: 0; }
+.q-sub { font-size: 11px; color: var(--muted); }
+.icon-btn { border: 1px solid var(--border); background: var(--bg); color: var(--muted); border-radius: 10px; width: 28px; height: 28px; cursor: pointer; font-size: 13px; }
+.icon-btn:hover { color: var(--primary); }
+.status { font-size: 12px; padding: 8px 12px; border-radius: 12px; background: var(--bg); color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+.status.on { background: color-mix(in srgb, var(--ok) 16%, var(--bg)); color: var(--ok); font-weight: 700; }
+.status.info { background: var(--surface); color: var(--text); }
+
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper button { width: 32px; height: 32px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); font-size: 18px; font-weight: 700; cursor: pointer; color: var(--primary); }
+.stepper b { min-width: 20px; text-align: center; font-size: 17px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 14px; font-weight: 600; }
+.row small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.card h3 { margin: 0 0 6px; font-size: 14px; color: var(--primary); }
+input[type=text], input[type=number], input[type=date], input[type=password], select, textarea { font: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px; background: var(--surface); color: var(--text); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.add-row input[type=text] { flex: 1; min-width: 120px; }
+.chk { font-size: 13px; color: var(--muted); display: flex; gap: 5px; align-items: center; }
+.type-select { width: 100%; margin: 8px 0 4px; }
+
+.m-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--surface); border-radius: 14px; padding: 8px 12px; margin-bottom: 6px; }
+.m-row.off { opacity: .6; }
+.m-name { flex: 1; min-width: 90px; font-weight: 700; font-size: 15px; }
+.seg { display: inline-flex; gap: 3px; }
+.seg button { min-width: 30px; height: 28px; padding: 0 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-weight: 800; font-size: 12px; cursor: pointer; }
+.seg .aM { background: var(--male); color: #fff; border-color: var(--male); }
+.seg .aF { background: var(--female); color: #fff; border-color: var(--female); }
+.seg .aA { background: var(--gA); color: #fff; border-color: var(--gA); }
+.seg .aB { background: var(--gB); color: #fff; border-color: var(--gB); }
+.seg .aC { background: var(--gC); color: #fff; border-color: var(--gC); }
+.seg .aX { background: var(--ok); color: #fff; border-color: var(--ok); }
+.wl { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.wl input { width: 52px; padding: 5px 6px; text-align: center; }
+.rate { min-width: 42px; text-align: right; font-weight: 800; color: var(--primary); font-size: 14px; }
+.bridge { font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: var(--border); color: var(--text); }
+.x-btn { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 17px; padding: 2px 6px; }
+.x-btn:hover { color: var(--danger); }
+.sec-title { font-weight: 800; font-size: 14px; margin: 16px 0 8px; display: flex; gap: 8px; align-items: center; }
+.log-head { font-weight: 800; font-size: 13px; color: var(--primary); margin: 16px 0 6px; }
+.log-row { background: var(--surface); border-radius: 14px; padding: 10px 12px; margin-bottom: 6px; font-size: 14px; }
+.log-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+.log-team.w { font-weight: 800; color: var(--ok); }
+.log-team.w::before { content: "勝 "; font-size: 11px; }
+.log-team.l { color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); text-align: center; padding: 10px 16px; line-height: 1.6; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; flex: 1; min-width: 140px; }
+.field input, .field select { width: 100%; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+@media (min-width: 700px) { .modal-backdrop { align-items: center; } }
+.modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 18px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; }
+@media (min-width: 700px) { .modal { border-radius: 20px; } }
+.modal h4 { margin: 0 0 8px; font-size: 15px; }
+.modal .sub { font-size: 12px; color: var(--muted); margin: 14px 0 6px; font-weight: 700; }
+.modal.dialog { max-width: 380px; z-index: 30; }
+.modal.dialog p { white-space: pre-line; line-height: 1.6; font-size: 14px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dialog-input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; margin-top: 6px; }
+.dialog-backdrop { z-index: 30; }
+.pick { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; font: inherit; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-bottom: 6px; cursor: pointer; }
+.pick .q-sub { white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand img { width: 46px; height: 46px; border-radius: 12px; background: #fff; object-fit: contain; padding: 2px; flex: none; }
+.brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.brand-name { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.flex { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.status.warn { background: color-mix(in srgb, var(--danger) 14%, var(--bg)); color: var(--danger); font-weight: 700; }
+.m-name-input { flex: 1; min-width: 80px; font-weight: 700; font-size: 15px; padding: 6px 9px; }
+.foot-logo { display: block; margin: 6px auto 8px; width: 64px; height: 64px; border-radius: 14px; background: #fff; padding: 3px; }
+.splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; background: var(--bg); }
+.splash img { width: 96px; height: 96px; border-radius: 22px; background: #fff; padding: 4px; margin-bottom: 18px; }
+.splash h1 { font-size: 21px; color: var(--primary); margin: 0 0 4px; }
+.splash .sub { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+.splash .ver { font-size: 13px; font-weight: 700; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 16px; margin-bottom: 26px; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+
+'use strict';
+const KEY = 'badminton-court-v2', OLD_KEY = 'badminton-court-v1';
+const LOGO = 'data:image/png;base64,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';
+const CLUB = 'Hong Konger in Sutton Badminton Club (HKSBC)';
+// App 版本：日期 + 當日流水號（YYYY.MM.DD-N）。每次將呢個檔案（index.html）實際重新部署去
+// GitHub Pages 網上版，先至手動更新呢個數字（同一日內如有多次部署，N 遞增；跨日就用新日期，N 由 1 開始）。
+// 呢個版本號只喺開 App 嗰陣嘅主頁畫面顯示，方便分辨自己部用緊邊個版本，唔涉及任何自動比對／更新邏輯。
+const APP_VERSION = '正式版本 2 (2026.09.29)';
+const uid = () => Math.random().toString(36).slice(2, 9);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
+/* ---------- 語言 / 翻譯 ---------- */
+const I18N = {
+  zh: {
+    langToggle: 'EN',
+    tabCourts: '活動', tabAttend: '出席', tabMembers: '會員', tabLog: '紀錄', tabSettings: '設定',
+    appTitle: 'HKSBC 活動編排',
+    tonightBadge: n => `本活動 ${n} 局`,
+    offlineFooterNote: '離線運作 · 資料儲存在此瀏覽器',
+    dlgOk: '知道', dlgCancel: '取消', dlgConfirm: '確定',
+    typeA: 'A 場', typeB: 'B 場', typeC: 'C 場', typeF: '女場', typeG: '混場', typeAB: 'A/B 場', typeBC: 'B/C 場',
+    subF1: '女雙', subF2: '混雙',
+    courtMenDoubles: '男雙場', courtWomenDoubles: '女雙場', courtMixedDoubles: '混雙場',
+    genderM: '男', genderF: '女',
+    mixedBadge: '混', guestBadge: '客', guestLabelFull: '訪客',
+    courtClosedAlert: '此場已完結。如要再用，請先按「重開此場」。',
+    fillFailSingle: '未能編排：此場的合資格排隊人數不足 4 人，或未能組成合規的一組。',
+    fillFailAll: '未能編排：排隊人數不足，或未能組成合規的一組。',
+    reduceCourtsBlocked: '要減少的場地仍有比賽進行中，請先完成或取消該場。',
+    swapInvalidGenderConfirm: '此組合不符合男雙 / 女雙 / 混雙規則（不會安排三男一女，混雙每隊須一男一女），仍要更換？',
+    replaceInvalidConfirm: '此組合不符合本場的編排規則（組別 / 場地類型 / 男女組合），仍要更換？',
+    confirmAttendNeedOne: '請先揀選至少一位出席會員。',
+    startNeedConfirm: '請先按「確認出席名單」。',
+    maxAttendReached: n => `已達本次活動最多出席人數（${n} 人）。`,
+    leavingWhilePlayingConfirm: '此選手正在場上比賽，離開後會由排隊選手替補（找不到替補則取消該局）。確定？',
+    allPresentSkipped: (max, skipped) => `已達最多出席人數（${max} 人），有 ${skipped} 人未能加入。`,
+    clearAttendConfirm: '場上仍有比賽進行中，這些選手會保留。確定清空其他出席？',
+    guestRemoveBlockedAlert: '此選手仍在場上比賽，請先完成該場或按「更改對戰名單」讓他離開。',
+    deleteGuestConfirm: name => `刪除訪客「${name}」？`,
+    promoteGuestConfirm: name => `把「${name}」加入會員名單？本次活動的勝負會一併計入累積紀錄。`,
+    dupNameConfirm: name => `已有同名會員「${name}」，仍要新增？`,
+    bulkAddedAlert: n => `已新增 ${n} 位會員。`,
+    bulkAddedSkippedAlert: (n, skipped) => `已新增 ${n} 位會員；${skipped} 位因為名單已有同名會員而略過。`,
+    memberRemoveBlockedAlert: '此選手仍在場上比賽，請先完成該場。',
+    deleteMemberConfirm: name => `確定刪除「${name}」及其累積勝負紀錄？此操作無法還原。`,
+    noActivityDataAlert: '本次活動未有出席或比賽資料。',
+    courtsNotClosedAlert: list => `仍有 ${list.join('、')} 號場未完結。\n請先在每個場按「完結此場」（進行中的比賽要先完成或取消該局），全部場地都完結後才可以完結活動。`,
+    endActivityConfirm: '完結並儲存本次活動？\n會員的累積勝負會保留，訪客資料只保存在活動紀錄內。',
+    endActivityPwPrompt: '請輸入管理員密碼以完結活動並匯出紀錄：',
+    wrongPwEndAlert: '密碼錯誤，活動未完結。',
+    copiedAlert: '已複製到剪貼簿，可以貼到「備忘錄」、「檔案」或其他 App 儲存。',
+    copyFailAlert: '未能自動複製，請喺上面文字框長按 → 全選 → 複製。',
+    exportTitle: name => `匯出：${name}`,
+    exportHint: ext => `已嘗試自動下載。如果無反應（部分瀏覽器／檔案 App 會封鎖下載），可以喺下面全選複製內文，貼到「備忘錄」、「檔案」等 App 自行儲存做 ${ext} 檔案。`,
+    closeBtn: '關閉', copyAllBtn: '複製全部', shareBtn: '分享',
+    shareUnsupportedAlert: '呢個瀏覽器唔支援直接分享，請用「複製全部」，再貼到 WhatsApp、Mail 或其他 App 傳送。',
+    noFinishedActivityAlert: '未有已完結的活動。',
+    activityLogFileName: date => `HKSBC-活動紀錄-${date}.csv`,
+    membersFileName: date => `HKSBC-會員資料-${date}.json`,
+    csvClub: '球會', csvActivityDate: '活動日期', csvVenue: '地點', csvCourtCount: '球場數', csvAttendCount: '出席人數', csvAttendList: '出席名單',
+    csvName: '姓名', csvRole: '身份', csvGender: '性別', csvGrade: '組別', csvMixedOk: '適合混雙', csvGames: '出賽局數', csvWins: '本次勝', csvLosses: '本次負', csvLeft: '中途離開',
+    csvGuest: '訪客', csvMember: '會員', csvYes: '是', csvNo: '否',
+    csvMatchLog: '比賽紀錄', csvRound: '局', csvTime: '時間', csvCourt: '場地', csvTeam1: '隊伍1', csvTeam2: '隊伍2', csvWinner: '勝方', csvDuration: '所需時間',
+    csvCourtN: n => `${n}號場`,
+    importConfirm: n => `匯入 ${n} 位會員？會覆蓋目前的會員名單（含累積勝負）。`,
+    badFileAlert: '檔案格式不正確。',
+    resetConfirm: '清除所有活動紀錄、比賽紀錄及目前活動？\n會員名單（含累積勝負）及設定會保留。此操作無法還原。',
+    courtNum: n => `${n} 號場`,
+    closedTag: '已完結',
+    courtClosedHint: '此場本次活動已完結。',
+    reopenCourtBtn: '重開此場',
+    nextRoundLabel: sub => `下一局：${sub}`,
+    courtQueueLine: list => `此場輪候：${list}`,
+    noEligiblePlayers: '（暫無合資格選手）',
+    streakTag: (stay, max) => `連勝 ${stay}${max ? '/' + max : ''} 場`,
+    winTeamTitle: '呢隊勝出',
+    confirmWinMsg: '確定：呢隊勝出？',
+    doneEditBtn: '完成更改', editMatchBtn: '✎ 更改對戰名單',
+    cancelClosingBtn: '取消完結', closeCourtAfterBtn: '完結此場（本局後）',
+    cancelMatchBtn: '取消此局',
+    editHint: '點選一位選手：可與同場交換位置、由排隊選手替換，或讓其離開活動。',
+    courtRoundLabel: (n, num) => `${n} 號場 · 第 ${num} 局`,
+    closingTag: '本局後停用',
+    autoAssign: '自動編排', setTypeA: '指定為 A 場', setTypeB: '指定為 B 場', setTypeC: '指定為 C 場', setTypeF: '指定為女場', setTypeG: '指定為混場',
+    idleTag: '空場',
+    closeCourtBtn: '完結此場', assignCourtBtn: '編排此場',
+    addGuestTitle: '加入訪客（非會員，只限本次活動，不會加入會員名單）',
+    guestNamePlaceholder: '訪客姓名',
+    suitableMixedLabel: '適合混雙',
+    addToActivityBtn: '＋ 加入活動',
+    notStartedHint: '🏸<br>尚未開始活動。<br>請先到「出席」分頁設定日期、地點，確認出席名單，然後按「開始活動」。<br><br>',
+    goToAttendBtn: '前往出席分頁',
+    noAttendeesHint: '🏸<br>未有出席名單。請到「出席」分頁揀選出席的會員，或在下面加入訪客。',
+    playedWaitLine: (played, wait) => `已打 ${played} 場 · 已輪空 ${wait} 局`,
+    queueTopTitle: '排到最前', moveUpTitle: '上移', moveDownTitle: '下移', leaveActivityTitle: '離開活動',
+    onlyOneFemaleWarn: '出席女生只有 1 人：不會安排三男一女，她暫時無法上場（需至少 2 位女生）。',
+    onlyOneMaleWarn: '出席男生只有 1 人：不會安排三女一男，他暫時無法上場（需至少 2 位男生）。',
+    wsOnMsg: max => `Winner Stay：已開啟 — A 場勝方留場${max ? '（最多連留 ' + max + ' 局）' : ''}`,
+    wsOffMsg: 'Winner Stay：未開啟',
+    reservedCourtLabel: (n, typeName, manual) => `${n} 號場＝${typeName}${manual ? '（人手指定）' : ''}`,
+    listSep: '；',
+    venueNotSet: '未設定地點',
+    fillAllBtn: '場地編排', endActivityBtn: '完結活動',
+    mustCloseAllWarn: '要完結活動，請先在下面每個場按「完結此場」。',
+    reservedLine: text => `保留場地：${text}`,
+    wsToggleBtn: 'Winner Stay',
+    queueTitle: n => `輪空名單（${n}）`,
+    noOneWaitingHint: '目前沒有人輪空。',
+    pendingCheckInTitle: n => `Check-in（${n}）`,
+    checkInBtn: 'Check-in',
+    checkOutBtn: 'Check-out',
+    checkedInBtn: '✓ 已 Check-in',
+    checkOutBlockedAlert: '此人正在場上比賽，不能取消 Check-in。',
+    swapTitle: (name, teamNum) => `更改：${name}（第 ${teamNum} 隊）`,
+    swapWithinLabel: '與同場選手交換位置',
+    teamLabel: n => `第 ${n} 隊`,
+    replaceFromQueueLabel: name => `由排隊選手替換（${name} 會回到隊伍，頂替對方的位置）`,
+    replaceCandLine: (played, wait, ineligible) => `已打 ${played} · 輪空 ${wait}${ineligible ? ' · 非此場對象' : ''}`,
+    queueEmptyLabel: '排隊名單是空的',
+    otherLabel: '其他',
+    leaveConfirmMsg: name => `${name} 離開活動？會由排隊選手替補。`,
+    leaveThisPlayerBtn: '此選手離開活動',
+    cancelBtn: '取消',
+    leftBadge: '已離開',
+    dateLabel: '日期', venueLabel: '地點', venuePlaceholder: '揀選或輸入地點', maxAttendLabel: '最多出席人數（0＝不限）',
+    noVenuesHint: '未設有地點，請先去「設定」頁新增',
+    courtsCountLabel: '本次活動球場數量',
+    noReservedCourtsHint: '未夠 4 個場：全部場都唔會預留，跟返各組別即時出席人數自然編排；4 個場或以上先會預留 1 號場（女仕，出席女性 4 人或以上先生效）同 3 號場（全男 A 組）',
+    startedStatusMsg: '活動已開始，出席名單已確認。',
+    confirmedStatusMsg: '出席名單已確認，活動即將開始。',
+    reconfirmStatusMsg: '出席名單已更改，請按「確認出席名單」以確認並返回活動分頁。',
+    notConfirmedStatusMsg: '請設定日期、地點及出席名單，然後按「確認出席名單」。',
+    sectionAllPresentBtn: '全部出席', clearPresentBtn: '清空出席', confirmAttendBtn: '確認出席名單',
+    startActivityBtn: dateStr => `開始 ${dateStr} 活動`,
+    attendCountNote: (count, max, m, f, a, b, c) => `出席 ${count}${max ? ' / ' + max : ''} 人（男 ${m} · 女 ${f} · A ${a} · B ${b} · C ${c}）`,
+    noMembersHint: '未有會員，請先到「會員」新增。',
+    gradeATitle: n => `<i class="gr A">A</i> GRADE A（${n}）`,
+    gradeBTitle: n => `<i class="gr B">B</i> GRADE B（${n}）`,
+    gradeCTitle: n => `<i class="gr C">C</i> GRADE C（${n}）`,
+    noGradeAMembers: '未有 A 組會員', noGradeBMembers: '未有 B 組會員', noGradeCMembers: '未有 C 組會員',
+    womenGroupTitle: n => `<i class="gr F">F</i> 女子組（${n}）`,
+    noWomenMembers: '未有女子組會員',
+    guestsSectionTitle: '訪客（於「活動」分頁加入 / 移除）',
+    mixedBtnLabel: on => on ? '✓ 混雙' : '混雙',
+    addToMembersBtn: '加入會員',
+    deleteGuestTitle: '刪除訪客',
+    editNameTitle: '可直接修改姓名',
+    mixedSuitTitle: '是否合適混合雙打',
+    mixedAutoTitle: '女仕自動適合混雙',
+    mixedAutoHint: '女仕自動適合混雙',
+    winsLabel: '勝', lossesLabel: '負',
+    deleteTitle: '刪除',
+    playerNamePlaceholder: '選手姓名',
+    addBtn: '＋ 新增',
+    bulkToggleBtn: open => open ? '收起批量新增' : '批量新增',
+    bulkPlaceholder: '每行一位，用逗號分隔：姓名,性別,組別,混雙&#10;例如：&#10;Chris Kwan,M,A&#10;Kitty Tang,F&#10;Alan Chan,M,B,混&#10;Tom Yip,M,C&#10;（姓名可以有空格；缺少性別預設男，缺少組別預設 B；組別可以係 A/B/C；寫「混」＝適合混雙。冇逗號都得，噉就用空格分隔，但姓名就唔可以有空格）',
+    addBulkBtn: '加入名單',
+    membersNote: () => `可直接修改姓名、性別、組別、混雙、勝負，或按 ✕ 刪除會員。勝負為累積紀錄（每局結果自動累加）。男仕分 A／B／C 三級：A 組永遠只同 A 組對打；C 組正常自己對打，唔夠 4 人就借 2 位 B 組頂住；B 組係橋樑，A 或 C 唔夠人都可以夾 B（一隊一位 A/C 配一位 B），B 自己夠人都可以純 B 對打。「混雙」= 適合混合雙打（男女同隊時，雙方都適合才會被安排）。`,
+    noMatchLogHint: '未有比賽紀錄。',
+    logCorrectionNote: '如有誤按勝負，可按「更正」對調勝負（會員的累積勝負會一併修正）。',
+    logHeadLabel: (isTonight, date, venue) => `${isTonight ? '本次活動 · ' : ''}${date} ${venue}`,
+    logTimeCourtLabel: (time, court) => `${time} · ${court} 號場`,
+    correctResultBtn: '更正勝負',
+    courtsTitle: '球場',
+    defaultCourtsLabel: '預設球場數量', defaultCourtsSub: '開啟新活動時使用，每次活動可在「出席」調整',
+    capacityRefTitle: '容量參考（學習中）',
+    capacityLearnedMsg: (mm, slots, suggested) => `已學到平均每場耗時約 ${mm} 分鐘（活動總時長固定 120 分鐘）。以而家場數計，一晚大約可以打 ${slots} 人次，建議出席上限約 ${suggested} 人。`,
+    capacityNotLearnedMsg: (courts, suggested) => `暫時未夠場次紀錄學到平均耗時（要打多幾場、每場都記得撳「完結」先計得到），而家用返你哋慣例做參考：${courts} 個場建議上限約 ${suggested} 人。`,
+    capacityRefPracticeLabel: '你哋慣例基準',
+    capacityRefPracticeSub: '2 個場 14＋2 人、4 個場 26＋2 人，其他場數按呢個比例推算；一旦學到足夠場次數據，上面就會自動改用實際平均耗時計算。',
+    wsMaxLabel: '最多連續留場局數', wsMaxSub: '0 = 不限。Winner Stay 的開關在「活動」頁由管理員人手啟動，連續留場不能多於此設定',
+    adminPwTitle: '管理員密碼',
+    adminPwFixedNotice: '密碼已固定為系統設定，不能喺呢度更改。進入「會員」「紀錄」「設定」頁，以及完結活動時，都需要輸入此密碼。',
+    defaultVenuesTitle: '預設活動地點',
+    defaultBadgeLabel: '預設',
+    setDefaultBtn: '設為預設',
+    noDefaultVenuesHint: '未有預設地點',
+    newVenuePlaceholder: '新增地點名稱',
+    joinBtn: '加入',
+    activityTitle: '活動',
+    newActivityLabel: '開啟新活動', newActivitySub: '如目前活動有資料，會先按完結活動的流程（需每個場完結、如有設定需要密碼）封存並匯出；沒有資料則直接重設',
+    newActivityBtn: '開啟新活動',
+    exportLastLabel: '匯出剛完結的活動紀錄',
+    exportLastSub: (date, venue, matches) => `${date} · ${venue} · ${matches} 局（CSV，可用 Excel 開啟）`,
+    exportBtn: '匯出',
+    membersOfflineTitle: '資料備份（離線儲存）',
+    fullBackupLabel: '匯出 / 匯入完整備份',
+    fullBackupSub: '包含會員名單、所有設定（跨組人數、Winner Stay 等）、活動紀錄及局數紀錄——建議定期匯出，避免瀏覽器儲存被系統清除後全部資料消失',
+    fullBackupFileName: date => `HKSBC-完整備份-${date}.json`,
+    importFullConfirm: (n, a) => `匯入完整備份？會覆蓋目前所有資料，包括會員名單（${n} 位）、設定同 ${a} 個活動紀錄。`,
+    importExportMembersLabel: '匯出 / 匯入會員名單（只限會員）', importExportMembersSub: '檔案只包含姓名、性別、組別、適合混雙及累積勝負，唔包括設定同活動紀錄——如想備份埋設定，請用返上面嘅「完整備份」',
+    importBtn: '匯入',
+    clearAllLabel: '清除所有資料', clearAllSub: '不包括會員名單（含累積勝負）及設定',
+    clearBtn: '清除',
+    ipadFolderTitle: 'iPad 離線資料夾',
+    ipadFolderNote: '建議在 iPad「檔案」App 建立一個資料夾（例如「HKSBC 羽毛球資料」），內裡再建立兩個子資料夾：<br>' +
+      '・「備份」— 存放上面匯出嘅「完整備份」JSON 檔<br>' +
+      '・「活動紀錄」— 存放每次活動完結後匯出的 CSV 檔（檔名已自動加上 HKSBC 及日期）<br>' +
+      '也可以把這個網頁檔案本身存放在同一資料夾，離線時在「檔案」App 直接打開即可使用（毋須網絡）。<br>' +
+      '日常資料會自動儲存在 Safari 瀏覽器內，但瀏覽器儲存有機會被系統清除（例如私人瀏覽、由 Messages／Mail 附件直接開啟、或長期冇打開），所以建議每次活動完結後，都匯出一次「完整備份」存入以上資料夾，萬一資料被清都可以隨時匯入還原。',
+    rulesTitle: '編排規則',
+    rulesNote: '① 排隊第一位必定優先安排，再從該組別中前段揀出勝率排位前列的三人。<br>' +
+      '② 男仕分 A／B／C 三級：A 組永遠只同 A 組對打（純 4 位 A），唔會同 B、C 或女仕混埋。<br>' +
+      '③ C 組正常情況自己對打（純 4 位 C）；C 組人數唔夠 4 人開場時，可以借 2 位 B 組頂住（2C+2B，一隊一位 C 配一位 B）。<br>' +
+      '④ B 組係 A 同 C 之間嘅橋樑：A 或 C 唔夠人自己開場，都可以各自夾 2 位 B（2A+2B 或 2C+2B，隊內一定一位 A/C 配一位 B）；B 組自己人數夠都可以純 B 對打。<br>' +
+      '⑤ 隊內配對盡量令兩隊實力平均，並避免重複同隊 / 同場；男女同隊時，優先安排適合混雙的會員。<br>' +
+      '⑥ 每場獨立：某場完成後，只有該場重新編排；輸方與勝方（無 Winner Stay 時）排到隊尾。<br>' +
+      '⑦ 勝率以（勝+1）÷（總場數+2）計算，避免新人只打一場就成 100% 或 0%。<br>' +
+      '⑧ 男女組合只會是四男（男雙）、四女（女雙）或二男二女（混雙，每隊一男一女），不會出現三男一女。<br>' +
+      '⑨ Winner Stay 由管理員在「活動」頁人手開啟；開啟後，A 組（兩位都是 A 組）勝方留場，只換 2 位挑戰者，連續留場局數不能多於設定中的上限。<br>' +
+      '⑩ 場地少於 4 個：全部場都唔會預留，跟返各組別即時出席人數自然編排。場地 4 個或以上：1 號場預留畀女仕專場（出席女性 4 人或以上先生效），3 號場預留畀全男 A 組（一定係純 A，唔理女仕人數）。管理員可在「活動」頁人手把任何空場指定為 A 場 / B 場 / C 場 / 女子場 / 混場，覆蓋自動安排（包括呢兩個預留場）。<br>' +
+      '⑪ 女子場（女性出席 4 人或以上）輪流編排：每 3 局中，第 1 局為女雙（全女），其後 2 局為混雙（二男二女，每隊一男一女，要換人）。<br>' +
+      '⑫ 女性出席少於 4 人時：唔會保留女子專場，但女仕可以夾入 B／C 場打混雙（每隊一男一女，A 組永遠唔會同女仕混雙）；B、C 兩組合埋計，大約每 3 局就會盡量安排一局有女仕混雙，避免女仕輪候太耐（A 組局數唔計入呢個計算）。<br>' +
+      '⑬ 每個場要人手按「完結此場」才會停用：空場會立即完結；進行中的場地會標記「本局後停用」，待該局完結後才真正停用（不會再編排新對戰，Winner Stay 亦不會留場）。全部場地都完結後，才可以完結整個活動；完結活動如有設定管理員密碼需要輸入，確認後會自動匯出本次活動紀錄（CSV）。',
+    membersPwPrompt: tabName => `請輸入管理員密碼以進入「${tabName}」頁：`,
+    wrongPwAlert: '密碼錯誤。',
+    promoteSettingsTitle: '陞降建議設定',
+    forceWomenTitle: '全場女子組輪替', forceWomenLabel: '每 N 局男子局後強制安排女子組', forceWomenSub: '連續 N 局全場（跨全部場地）都冇女性參與後，下一個可以編排嘅場會優先夾一組有女性（女雙或混雙）嘅組合；搵唔到都唔會令場地閒置，會照樣安排，等有足夠女性先再算。設 0 = 停用呢個規則。',
+    promoteMinGamesLabel: '最少近期比賽場數', promoteMinGamesSub: '用於計算陞降建議的近期比賽局數（少於此場數不會有建議）',
+    promoteWinRateLabel: '陞班勝率門檻（%）', promoteWinRateSub: 'B 組會員近期勝率達到此百分比，會建議陞至 A 組',
+    relegateWinRateLabel: '降班勝率門檻（%）', relegateWinRateSub: 'A 組會員近期勝率低於或等於此百分比，會建議降至 B 組',
+    suggestSectionTitle: '建議名單',
+    suggestNoneHint: n => `暫無建議陞降的會員（需要至少 ${n} 場近期比賽紀錄）。`,
+    suggestWinRateLine: (games, rate) => `近 ${games} 場勝率 ${rate}%`,
+    suggestChangeLine: g => `建議轉至 ${g} 組`,
+    suggestApplyBtn: '套用',
+    memberSortByName: '按姓名', memberSortByRecord: '按戰績',
+    memberSortLabel: '排序：',
+    adminModeOnBtn: '🔓 管理員模式', adminModeOffBtn: '🔒 訪客模式',
+    adminModeBanner: '《管理員 MODE》',
+    adminModePwPrompt: '請輸入管理員密碼以開啟管理員模式：',
+    adminModeLockedHint: '此分頁需要管理員模式。請按頁首「🔒 訪客模式」並輸入密碼。',
+    appName: 'HKSBC 活動編排',
+    splashContinueBtn: '進入',
+    splashVersionLabel: v => `版本 ${v}`,
+    trendCardTitle: '個人戰績走勢',
+    trendPickPlaceholder: '揀選會員…',
+    trendPickHint: '請先揀選一位會員，查看其戰績走勢。',
+    trendTotalLabel: '總場數', trendWinsLossesLabel: '勝 / 負', trendWinRateLabel: '總勝率',
+    trendLast10Label: '近 10 場勝率', trendLast30Label: '近 30 場勝率', trendSparkLabel: '走勢',
+    summaryCardTitle: '球季 / 月度總結',
+    summaryNoDataHint: '未有已完結的活動或比賽紀錄可供總結。',
+    summaryActivitiesLabel: '活動場次', summaryAttendanceLabel: '總出席人次', summaryMatchesLabel: '總比賽局數',
+    summaryTopGamesTitle: '出賽最多', summaryTopRateTitle: '勝率最高（至少 3 場）',
+    summaryNoneHint: '暫無資料。',
+  },
+  en: {
+    langToggle: '中',
+    tabCourts: 'Courts', tabAttend: 'Attendance', tabMembers: 'Members', tabLog: 'Log', tabSettings: 'Settings',
+    appTitle: 'HKSBC Court Manager',
+    tonightBadge: n => `${n} games tonight`,
+    offlineFooterNote: 'Works offline · Data stored in this browser',
+    dlgOk: 'OK', dlgCancel: 'Cancel', dlgConfirm: 'Confirm',
+    typeA: 'Court A', typeB: 'Court B', typeC: 'Court C', typeF: 'Women\'s Court', typeG: 'Mixed Court', typeAB: 'Court A/B', typeBC: 'Court B/C',
+    subF1: 'Women\'s Doubles', subF2: 'Mixed Doubles',
+    courtMenDoubles: 'Men\'s Doubles', courtWomenDoubles: 'Women\'s Doubles', courtMixedDoubles: 'Mixed Doubles',
+    genderM: 'Male', genderF: 'Female',
+    mixedBadge: 'Mx', guestBadge: 'G', guestLabelFull: 'Guest',
+    courtClosedAlert: 'This court has ended. To use it again, tap "Reopen this court" first.',
+    fillFailSingle: 'Could not assign: not enough eligible players in the queue for this court (need 4), or no valid group can be formed.',
+    fillFailAll: 'Could not assign: not enough players in the queue, or no valid group can be formed.',
+    reduceCourtsBlocked: 'A match is still in progress on the court(s) being removed. Please finish or cancel it first.',
+    swapInvalidGenderConfirm: 'This combination breaks the men\'s / women\'s / mixed doubles rule (no 3-men-1-woman lineups; mixed doubles need one man and one woman per team). Swap anyway?',
+    replaceInvalidConfirm: 'This combination breaks this court\'s assignment rules (grade / court type / gender mix). Swap anyway?',
+    confirmAttendNeedOne: 'Please select at least one attending member first.',
+    startNeedConfirm: 'Please tap "Confirm attendance" first.',
+    maxAttendReached: n => `Reached the maximum attendance for this activity (${n} people).`,
+    leavingWhilePlayingConfirm: 'This player is currently on court. Leaving will bring in a replacement from the queue (or cancel the game if none is available). Continue?',
+    allPresentSkipped: (max, skipped) => `Reached the maximum attendance (${max} people); ${skipped} could not be added.`,
+    clearAttendConfirm: 'Matches are still in progress; those players will be kept. Clear the rest of the attendance list?',
+    guestRemoveBlockedAlert: 'This player is currently on court. Please finish that game first, or use "Edit lineup" to have them leave.',
+    deleteGuestConfirm: name => `Remove guest "${name}"?`,
+    promoteGuestConfirm: name => `Add "${name}" to the member list? This activity's results will be included in their cumulative record.`,
+    dupNameConfirm: name => `A member named "${name}" already exists. Add anyway?`,
+    bulkAddedAlert: n => `${n} member(s) added.`,
+    bulkAddedSkippedAlert: (n, skipped) => `${n} member(s) added; ${skipped} skipped because a member with that name already exists.`,
+    memberRemoveBlockedAlert: 'This player is currently on court. Please finish that game first.',
+    deleteMemberConfirm: name => `Delete "${name}" and their cumulative win/loss record? This cannot be undone.`,
+    noActivityDataAlert: 'No attendance or match data for this activity.',
+    courtsNotClosedAlert: list => `Court${list.length > 1 ? 's' : ''} ${list.join(', ')} ${list.length > 1 ? 'are' : 'is'} not yet closed.\nPlease tap "End this court" on each court (finish or cancel any match in progress first). All courts must be closed before you can end the activity.`,
+    endActivityConfirm: 'End and save this activity?\nMembers\' cumulative win/loss records will be kept; guest data is only saved in the activity log.',
+    endActivityPwPrompt: 'Enter the admin password to end the activity and export the log:',
+    wrongPwEndAlert: 'Wrong password, activity not ended.',
+    copiedAlert: 'Copied to clipboard — you can paste it into Notes, Files, or another app to save it.',
+    copyFailAlert: 'Could not copy automatically. Please long-press the text box above → Select All → Copy.',
+    exportTitle: name => `Export: ${name}`,
+    exportHint: ext => `A download was attempted automatically. If nothing happened (some browsers/Files apps block downloads), you can select all the text below and paste it into Notes, Files or another app to save it as a ${ext} file.`,
+    closeBtn: 'Close', copyAllBtn: 'Copy All', shareBtn: 'Share',
+    shareUnsupportedAlert: 'This browser doesn’t support direct sharing — use "Copy All" and paste it into WhatsApp, Mail or another app instead.',
+    noFinishedActivityAlert: 'No finished activity yet.',
+    activityLogFileName: date => `HKSBC-Activity-Log-${date}.csv`,
+    membersFileName: date => `HKSBC-Members-${date}.json`,
+    csvClub: 'Club', csvActivityDate: 'Activity Date', csvVenue: 'Venue', csvCourtCount: 'Courts', csvAttendCount: 'Attendees', csvAttendList: 'Attendance List',
+    csvName: 'Name', csvRole: 'Role', csvGender: 'Gender', csvGrade: 'Grade', csvMixedOk: 'Mixed OK', csvGames: 'Games Played', csvWins: 'Wins', csvLosses: 'Losses', csvLeft: 'Left Early',
+    csvGuest: 'Guest', csvMember: 'Member', csvYes: 'Yes', csvNo: 'No',
+    csvMatchLog: 'Match Log', csvRound: 'Game', csvTime: 'Time', csvCourt: 'Court', csvTeam1: 'Team 1', csvTeam2: 'Team 2', csvWinner: 'Winner', csvDuration: 'Duration',
+    csvCourtN: n => `Court ${n}`,
+    importConfirm: n => `Import ${n} member(s)? This will overwrite the current member list (including cumulative records).`,
+    badFileAlert: 'Invalid file format.',
+    resetConfirm: 'Clear all activity history, match logs and the current activity?\nThe member list (with cumulative records) and settings will be kept. This cannot be undone.',
+    courtNum: n => `Court ${n}`,
+    closedTag: 'Ended',
+    courtClosedHint: 'This court has ended for this activity.',
+    reopenCourtBtn: 'Reopen this court',
+    nextRoundLabel: sub => `Next: ${sub}`,
+    courtQueueLine: list => `Up next on this court: ${list}`,
+    noEligiblePlayers: '(No eligible players right now)',
+    streakTag: (stay, max) => `${stay} win streak${max ? '/' + max : ''}`,
+    winTeamTitle: 'This team wins',
+    confirmWinMsg: 'Confirm: this team wins?',
+    doneEditBtn: 'Done editing', editMatchBtn: '✎ Edit lineup',
+    cancelClosingBtn: 'Cancel ending', closeCourtAfterBtn: 'End this court (after this game)',
+    cancelMatchBtn: 'Cancel this game',
+    editHint: 'Tap a player: swap with a teammate on this court, replace with someone from the queue, or have them leave the activity.',
+    courtRoundLabel: (n, num) => `Court ${n} · Game ${num}`,
+    closingTag: 'Ending after this game',
+    autoAssign: 'Auto-assign', setTypeA: 'Set as Court A', setTypeB: 'Set as Court B', setTypeC: 'Set as Court C', setTypeF: 'Set as Women\'s Court', setTypeG: 'Set as Mixed Court',
+    idleTag: 'Idle',
+    closeCourtBtn: 'End this court', assignCourtBtn: 'Assign this court',
+    addGuestTitle: 'Add a guest (non-member, this activity only, not added to the member list)',
+    guestNamePlaceholder: 'Guest name',
+    suitableMixedLabel: 'Suitable for mixed doubles',
+    addToActivityBtn: '＋ Add to activity',
+    notStartedHint: '🏸<br>Activity not started yet.<br>Go to the "Attendance" tab to set the date and venue, confirm the attendance list, then tap "Start activity".<br><br>',
+    goToAttendBtn: 'Go to Attendance',
+    noAttendeesHint: '🏸<br>No attendance list yet. Go to the "Attendance" tab to select attending members, or add a guest below.',
+    playedWaitLine: (played, wait) => `Played ${played} · Waited ${wait}`,
+    queueTopTitle: 'Move to front', moveUpTitle: 'Move up', moveDownTitle: 'Move down', leaveActivityTitle: 'Leave activity',
+    onlyOneFemaleWarn: 'Only 1 woman is present: no 3-men-1-woman lineups will be made, so she cannot play yet (needs at least 2 women).',
+    onlyOneMaleWarn: 'Only 1 man is present: no 3-women-1-man lineups will be made, so he cannot play yet (needs at least 2 men).',
+    wsOnMsg: max => `Winner Stay: On — winning team stays on Court A${max ? ` (up to ${max} games in a row)` : ''}`,
+    wsOffMsg: 'Winner Stay: Off',
+    reservedCourtLabel: (n, typeName, manual) => `Court ${n} = ${typeName}${manual ? ' (manually set)' : ''}`,
+    listSep: '; ',
+    venueNotSet: 'No venue set',
+    fillAllBtn: 'Court arrangement', endActivityBtn: 'End activity',
+    mustCloseAllWarn: 'To end the activity, please tap "End this court" on every court below first.',
+    reservedLine: text => `Reserved courts: ${text}`,
+    wsToggleBtn: 'Winner Stay',
+    queueTitle: n => `Queue (${n})`,
+    noOneWaitingHint: 'No one is waiting right now.',
+    pendingCheckInTitle: n => `Check-in (${n})`,
+    checkInBtn: 'Check-in',
+    checkOutBtn: 'Check-out',
+    checkedInBtn: '✓ Checked in',
+    checkOutBlockedAlert: 'This person is currently playing and cannot be un-checked-in.',
+    swapTitle: (name, teamNum) => `Edit: ${name} (Team ${teamNum})`,
+    swapWithinLabel: 'Swap with a player on this court',
+    teamLabel: n => `Team ${n}`,
+    replaceFromQueueLabel: name => `Replace with a player from the queue (${name} will return to the queue, taking the other player's spot)`,
+    replaceCandLine: (played, wait, ineligible) => `Played ${played} · Waited ${wait}${ineligible ? ' · not eligible for this court' : ''}`,
+    queueEmptyLabel: 'The queue is empty',
+    otherLabel: 'Other',
+    leaveConfirmMsg: name => `${name} leaves the activity? A replacement will come from the queue.`,
+    leaveThisPlayerBtn: 'This player leaves the activity',
+    cancelBtn: 'Cancel',
+    leftBadge: 'Left',
+    dateLabel: 'Date', venueLabel: 'Venue', venuePlaceholder: 'Pick or type a venue', maxAttendLabel: 'Max attendance (0 = no limit)',
+    noVenuesHint: 'No venues set — add one in Settings first',
+    courtsCountLabel: 'Number of courts for this activity',
+    noReservedCourtsHint: 'Fewer than 4 courts: nothing is reserved, courts fill naturally from each grade\'s live attendance; 4+ courts reserves Court 1 (women, only when 4+ women are present) and Court 3 (pure Grade A)',
+    startedStatusMsg: 'Activity started, attendance confirmed.',
+    confirmedStatusMsg: 'Attendance confirmed, activity is about to start.',
+    reconfirmStatusMsg: 'Attendance list changed — tap "Confirm attendance" to confirm and return to the activity tab.',
+    notConfirmedStatusMsg: 'Please set the date, venue and attendance list, then tap "Confirm attendance".',
+    sectionAllPresentBtn: 'Select all', clearPresentBtn: 'Clear all', confirmAttendBtn: 'Confirm attendance',
+    startActivityBtn: dateStr => `Start ${dateStr} activity`,
+    attendCountNote: (count, max, m, f, a, b, c) => `${count}${max ? ' / ' + max : ''} attending (M ${m} · F ${f} · A ${a} · B ${b} · C ${c})`,
+    noMembersHint: 'No members yet — add some on the "Members" tab first.',
+    gradeATitle: n => `<i class="gr A">A</i> Grade A (${n})`,
+    gradeBTitle: n => `<i class="gr B">B</i> Grade B (${n})`,
+    gradeCTitle: n => `<i class="gr C">C</i> Grade C (${n})`,
+    noGradeAMembers: 'No Grade A members', noGradeBMembers: 'No Grade B members', noGradeCMembers: 'No Grade C members',
+    womenGroupTitle: n => `<i class="gr F">F</i> Women (${n})`,
+    noWomenMembers: 'No women members',
+    guestsSectionTitle: 'Guests (add / remove on the "Courts" tab)',
+    mixedBtnLabel: on => on ? '✓ Mixed' : 'Mixed',
+    addToMembersBtn: 'Add to members',
+    deleteGuestTitle: 'Delete guest',
+    editNameTitle: 'Tap to edit name',
+    mixedSuitTitle: 'Suitable for mixed doubles',
+    mixedAutoTitle: 'Women are automatically suitable for mixed doubles',
+    mixedAutoHint: 'Automatic for women',
+    winsLabel: 'W', lossesLabel: 'L',
+    deleteTitle: 'Delete',
+    playerNamePlaceholder: 'Player name',
+    addBtn: '＋ Add',
+    bulkToggleBtn: open => open ? 'Hide bulk add' : 'Bulk add',
+    bulkPlaceholder: 'One per line, comma-separated: Name,Gender,Grade,Mixed&#10;e.g.&#10;Chris Kwan,M,A&#10;Kitty Tang,F&#10;Alan Chan,M,B,Mixed&#10;Tom Yip,M,C&#10;(names can contain spaces; gender defaults to M, grade defaults to B if omitted; grade can be A/B/C; write "Mixed" if suitable for mixed doubles. Commas are optional — without them, fields are space-separated, but then names can’t contain spaces)',
+    addBulkBtn: 'Add to list',
+    membersNote: () => `You can edit name, gender, grade, mixed-doubles suitability and win/loss directly, or tap ✕ to delete a member. Win/loss is a cumulative record (updated automatically after each game). Men are split into Grades A/B/C: Grade A always plays only Grade A; Grade C normally plays its own group and borrows 2 Grade B players when short of 4; Grade B is the bridge — it fills in for either A or C when they're short (one A/C paired with one B per team), and plays purely among itself when it has enough. "Mixed" = suitable for mixed doubles (when paired with the opposite gender, both must be marked suitable to be scheduled together).`,
+    noMatchLogHint: 'No match history yet.',
+    logCorrectionNote: 'If a result was recorded by mistake, tap "Correct" to swap the winner (members\' cumulative records are adjusted too).',
+    logHeadLabel: (isTonight, date, venue) => `${isTonight ? 'This activity · ' : ''}${date} ${venue}`,
+    logTimeCourtLabel: (time, court) => `${time} · Court ${court}`,
+    correctResultBtn: 'Correct',
+    courtsTitle: 'Courts',
+    defaultCourtsLabel: 'Default number of courts', defaultCourtsSub: 'Used when starting a new activity; can be adjusted per activity on the "Attendance" tab',
+    capacityRefTitle: 'Capacity reference (learning)',
+    capacityLearnedMsg: (mm, slots, suggested) => `Learned average match time is about ${mm} minutes (fixed 120-minute session). With the current court count, one night can fit about ${slots} player-slots — suggested attendance cap is about ${suggested}.`,
+    capacityNotLearnedMsg: (courts, suggested) => `Not enough recorded matches yet to learn an average duration (play a few more sessions and remember to close out each match). For now, using your usual practice as a reference: ${courts} court(s) → suggested cap about ${suggested}.`,
+    capacityRefPracticeLabel: 'Your usual baseline',
+    capacityRefPracticeSub: '2 courts → 14+2 people, 4 courts → 26+2 people; other court counts are extrapolated from this ratio. Once enough matches are recorded, the figure above switches to your real average automatically.',
+    wsMaxLabel: 'Max consecutive Winner Stay games', wsMaxSub: '0 = no limit. Winner Stay itself is switched on by an admin on the "Courts" tab; consecutive stays cannot exceed this setting',
+    adminPwTitle: 'Admin Password',
+    adminPwFixedNotice: 'The password is fixed by the system and can’t be changed here. It’s required to open the Members, Log and Settings tabs, and to end an activity.',
+    defaultVenuesTitle: 'Default Venues',
+    defaultBadgeLabel: 'Default',
+    setDefaultBtn: 'Set as default',
+    noDefaultVenuesHint: 'No default venues yet',
+    newVenuePlaceholder: 'New venue name',
+    joinBtn: 'Add',
+    activityTitle: 'Activity',
+    newActivityLabel: 'Start a new activity', newActivitySub: 'If the current activity has data, it will first go through the end-activity flow (every court must be closed, password if set) and be archived/exported; otherwise it resets right away',
+    newActivityBtn: 'Start new activity',
+    exportLastLabel: 'Export the last finished activity log',
+    exportLastSub: (date, venue, matches) => `${date} · ${venue} · ${matches} game(s) (CSV, opens in Excel)`,
+    exportBtn: 'Export',
+    membersOfflineTitle: 'Data Backup (Stored Offline)',
+    fullBackupLabel: 'Export / Import full backup',
+    fullBackupSub: 'Includes the member list, all settings (bridge counts, Winner Stay, etc.), activity history and match log — export this regularly in case browser storage gets cleared by the system',
+    fullBackupFileName: date => `HKSBC-Full-Backup-${date}.json`,
+    importFullConfirm: (n, a) => `Import full backup? This will overwrite all current data, including the member list (${n}), all settings, and ${a} activity record(s).`,
+    importExportMembersLabel: 'Export / Import member list (members only)', importExportMembersSub: 'The file only includes name, gender, grade, mixed-doubles suitability and cumulative records — not settings or activity history. Use "full backup" above if you also want settings backed up',
+    importBtn: 'Import',
+    clearAllLabel: 'Clear all data', clearAllSub: 'Does not include the member list (with cumulative records) or settings',
+    clearBtn: 'Clear',
+    ipadFolderTitle: 'iPad Offline Folder',
+    ipadFolderNote: 'It\'s a good idea to create a folder in the iPad Files app (e.g. "HKSBC Badminton Data") with two subfolders inside:<br>' +
+      '&bull; "Backups" — for the "full backup" JSON file exported above<br>' +
+      '&bull; "Activity Logs" — for the CSV file exported after each activity ends (the filename already includes HKSBC and the date)<br>' +
+      'You can also keep this web page file itself in the same folder, and open it directly from the Files app while offline (no network needed).<br>' +
+      'Day-to-day data is auto-saved in Safari, but browser storage can be cleared by the system (e.g. Private Browsing, opening the file directly as a Mail/Messages attachment, or long periods without opening it), so it\'s a good idea to export a "full backup" into the folder above after every activity — you can re-import it any time if data is ever cleared.',
+    rulesTitle: 'Scheduling Rules',
+    rulesNote: '① The first person in the queue is always prioritized, then three more are picked from the top of that group\'s win-rate ranking.<br>' +
+      '② Men are split into Grades A/B/C: Grade A always plays only Grade A (pure 4-A games) and never mixes with B, C or women.<br>' +
+      '③ Grade C normally plays among itself (pure 4-C games); when short of 4, it can borrow 2 Grade B players (2C+2B, one C paired with one B per team).<br>' +
+      '④ Grade B is the bridge between A and C: when A or C is short of 4 to start its own game, each can borrow 2 Grade B players (2A+2B or 2B+2C, always one A/C paired with one B per team); Grade B also plays purely among itself when it has enough of its own.<br>' +
+      '⑤ Team pairing tries to keep both teams evenly matched in strength and avoid repeat teammates/opponents; when men and women share a court, members suitable for mixed doubles are prioritized.<br>' +
+      '⑥ Each court is independent: when a court finishes, only that court is reassigned; losers (and winners, without Winner Stay) go to the back of the queue.<br>' +
+      '⑦ Win rate is calculated as (wins+1) ÷ (total games+2), so a newcomer doesn\'t hit 100% or 0% after just one game.<br>' +
+      '⑧ Gender mixes are always 4 men (men\'s doubles), 4 women (women\'s doubles), or 2 men + 2 women (mixed doubles, one man and one woman per team) — never 3-and-1.<br>' +
+      '⑨ Winner Stay is switched on manually by an admin on the "Courts" tab; when on, a Grade A winning team (both players Grade A) stays on court, only the 2 challengers are swapped, and the streak cannot exceed the configured limit.<br>' +
+      '⑩ Fewer than 4 courts: nothing is reserved — courts fill naturally from each grade\'s live attendance. 4 or more courts: Court 1 is reserved for a women\'s court (only takes effect with 4+ women present), and Court 3 is reserved for pure Grade A (regardless of how many women are present). An admin can manually set any idle court to Court A / Court B / Court C / Women\'s / Mixed on the "Courts" tab, overriding the automatic assignment (including these two reserved courts).<br>' +
+      '⑪ Women\'s court rotation (4+ women present): every 3 games, the 1st is women\'s doubles (all women), the next 2 are mixed doubles (2 men + 2 women, one man and one woman per team, with a lineup change).<br>' +
+      '⑫ With fewer than 4 women present: no women\'s court is reserved, but women can be worked into Grade B/C games as mixed doubles (one man and one woman per team; Grade A never mixes with women). Roughly one in every 3 combined B/C games will try to include such a mixed round, to avoid women waiting too long (Grade A games are not counted in this).<br>' +
+      '⑬ A court is only deactivated once an admin taps "End this court": an idle court ends immediately; a court in play is marked "Ending after this game" and only truly deactivates once that game finishes (no new match will be scheduled, and Winner Stay will not keep the team on). The whole activity can only be ended once every court is closed; if an admin password is set, it\'s required to end the activity, and the activity log (CSV) is exported automatically afterwards.',
+    membersPwPrompt: tabName => `Enter the admin password to open the "${tabName}" tab:`,
+    wrongPwAlert: 'Wrong password.',
+    promoteSettingsTitle: 'Promotion / relegation suggestions',
+    forceWomenTitle: 'Whole-session women’s rotation', forceWomenLabel: 'Force a women’s match every N men’s games', forceWomenSub: 'After N consecutive games with no women (counted across ALL courts), the next court to be filled will first try to include women (women’s or mixed doubles). If that’s not possible the court is filled normally rather than left idle, and it keeps trying until enough women are available. Set to 0 to turn this off.',
+    promoteMinGamesLabel: 'Minimum recent games', promoteMinGamesSub: 'How many recent games to use for suggestions (fewer than this = no suggestion)',
+    promoteWinRateLabel: 'Promote win-rate threshold (%)', promoteWinRateSub: 'A grade B member whose recent win rate reaches this will be suggested for promotion to A',
+    relegateWinRateLabel: 'Relegate win-rate threshold (%)', relegateWinRateSub: 'A grade A member whose recent win rate is at or below this will be suggested for relegation to B',
+    suggestSectionTitle: 'Suggested changes',
+    suggestNoneHint: n => `No promotion/relegation suggestions right now (needs at least ${n} recent logged games).`,
+    suggestWinRateLine: (games, rate) => `${rate}% win rate over last ${games} games`,
+    suggestChangeLine: g => `Suggest move to Grade ${g}`,
+    suggestApplyBtn: 'Apply',
+    memberSortByName: 'By name', memberSortByRecord: 'By record',
+    memberSortLabel: 'Sort:',
+    adminModeOnBtn: '🔓 Admin Mode', adminModeOffBtn: '🔒 Guest Mode',
+    adminModeBanner: '《ADMIN MODE》',
+    adminModePwPrompt: 'Enter the admin password to turn on Admin Mode:',
+    adminModeLockedHint: 'This tab requires Admin Mode. Tap "🔒 Guest Mode" at the top and enter the password.',
+    appName: 'HKSBC Court Manager',
+    splashContinueBtn: 'Continue',
+    splashVersionLabel: v => `Version ${v}`,
+    trendCardTitle: 'Personal performance trend',
+    trendPickPlaceholder: 'Pick a member…',
+    trendPickHint: 'Pick a member above to see their performance trend.',
+    trendTotalLabel: 'Total games', trendWinsLossesLabel: 'Wins / Losses', trendWinRateLabel: 'Overall win rate',
+    trendLast10Label: 'Win rate (last 10)', trendLast30Label: 'Win rate (last 30)', trendSparkLabel: 'Trend',
+    summaryCardTitle: 'Season / monthly summary',
+    summaryNoDataHint: 'No finished activities or match log to summarise yet.',
+    summaryActivitiesLabel: 'Sessions', summaryAttendanceLabel: 'Total attendance', summaryMatchesLabel: 'Total matches',
+    summaryTopGamesTitle: 'Most games played', summaryTopRateTitle: 'Highest win rate (3+ games)',
+    summaryNoneHint: 'No data.',
+  },
+};
+const t = (key, ...args) => {
+  const s = (I18N[state.settings.lang || 'zh'] || I18N.zh)[key];
+  return typeof s === 'function' ? s(...args) : (s ?? key);
+};
+function toggleLang() { state.settings.lang = state.settings.lang === 'en' ? 'zh' : 'en'; save(); render(); }
+
+/* ---------- 資料結構 ---------- */
+function newCourt() { return { status: 'idle', teams: null, stay: 0, num: 0, manualType: null, closing: false, startedAt: null, fSub: 0, fWinPair: null, fQuad: null, fPairA: null, fPairB: null, fFourIds: null, fFourIdx: 0, isWomenCourt: false }; }
+function freshSession(n, venue) {
+  return { date: today(), venue: venue || '', maxAttend: 0, ws: false, started: false, attendConfirmed: false,
+           guests: [], present: [], checkedIn: [], left: [], queue: [], courts: Array.from({ length: n }, newCourt),
+           played: {}, wait: {}, pairs: {}, mates: {}, counter: 0, night: Date.now(), maleStreak: 0, rev: 0 };
+}
+const FIXED_ADMIN_PASSWORD = 'sar59red';
+const SESSION_MINUTES = 120;    // 活動總時長固定兩小時，唔使學習
+// 學習「平均每場耗時」：攞最近有記錄嘅場次（durationMs）計平均值，樣本太少就當未學到，交返後備參考數字。
+function learnedMatchMinutes() {
+  const durs = state.log.filter(l => l.durationMs != null && l.durationMs > 0 && l.durationMs < 2 * 3600 * 1000)
+    .slice(0, 300).map(l => l.durationMs);
+  if (durs.length < 8) return null;
+  return durs.reduce((a, b) => a + b, 0) / durs.length / 60000;
+}
+// 未學夠數據之前嘅後備基準：跟返你哋實際慣例（2 個場 14 人、4 個場 26 人）做兩點線性推算，
+// 其他場數（不足 2 場、多於 4 場）都用同一條斜率外推。
+function practiceBaseAttend(courts) {
+  return Math.max(0, Math.round(14 + (courts - 2) * 6));
+}
+// 容量估算：有足夠學習數據就用「平均每場耗時 + 固定 120 分鐘活動時長」計；未夠就用返practice 基準（+2 彈性名額）。
+function capacityEstimate() {
+  const courts = state.session.courts.length;
+  const mm = learnedMatchMinutes();
+  if (mm != null) {
+    const totalSlots = courts * (SESSION_MINUTES / mm) * 4;   // 一晚總共可以容納嘅「人次」
+    return { learned: true, matchMinutes: mm, totalSlots, suggested: Math.max(0, Math.round(totalSlots / 6)) };
+    // 註：/6 對應你哋慣例入面隱含嘅「每人大約打 6 局」呢個目標，同 26+2／14+2 個比例大致脗合。
+  }
+  return { learned: false, matchMinutes: null, totalSlots: null, suggested: practiceBaseAttend(courts) + 2 };
+}
+function freshSettings() { return { courts: 4, wsMax: 2, venues: ['Sutton Grammar School', 'Westcroft Leisure Centre'], adminPassword: FIXED_ADMIN_PASSWORD, lang: 'zh',
+  promoteMinGames: 20, promoteWinRate: 65, relegateWinRate: 35, forceWomenEveryN: 3, rev: 0 }; }
+function freshState() { const st = freshSettings(); return { members: [], settings: st, log: [], activities: [], session: freshSession(st.courts, st.venues[0] || '') }; }
+
+function normMember(m) {
+  const gender = m.gender === 'F' ? 'F' : 'M';
+  // 女仕自動適合混雙，唔使人手設定（亦唔可以關閉）。
+  return { id: m.id || uid(), name: String(m.name || '?'), gender, grade: (m.grade === 'A' || m.grade === 'C') ? m.grade : 'B',
+           mixed: gender === 'F' ? true : !!m.mixed, wins: Math.max(0, +m.wins || 0), losses: Math.max(0, +m.losses || 0) };
+}
+function normalize(raw) {
+  const d = freshState();
+  const rs = raw.settings || {};
+  const s = { members: (raw.members || []).map(normMember) };
+  s.settings = { ...d.settings, ...rs };
+  delete s.settings.ws; delete s.settings.wsMin;
+  delete s.settings.bridgeA; delete s.settings.bridgeB; // 舊版「跨組」設定已經取消，唔再使用
+  s.settings.venues = (Array.isArray(rs.venues) && rs.venues.length) ? rs.venues.map(String) : d.settings.venues.slice();
+  s.settings.courts = Math.max(1, Math.min(20, +s.settings.courts || 4));
+  s.settings.adminPassword = FIXED_ADMIN_PASSWORD; // 密碼已改為系統固定，唔再喺設定頁俾人改
+  s.settings.lang = rs.lang === 'en' ? 'en' : 'zh';
+  s.settings.promoteMinGames = Math.max(1, Math.min(100, +s.settings.promoteMinGames || 20));
+  s.settings.promoteWinRate = Math.max(1, Math.min(100, +s.settings.promoteWinRate || 65));
+  s.settings.relegateWinRate = Math.max(0, Math.min(100, +s.settings.relegateWinRate || 35));
+  { const fw = rs.forceWomenEveryN; s.settings.forceWomenEveryN = (fw === 0 || fw === '0') ? 0 : Math.max(1, Math.min(20, +fw || 3)); }
+  s.settings.rev = Math.max(0, parseInt(rs.rev, 10) || 0);
+  s.log = Array.isArray(raw.log) ? raw.log.slice(0, 1000) : [];
+  s.activities = Array.isArray(raw.activities) ? raw.activities.slice(0, 100) : [];
+  const se = raw.session || {};
+  const guests = (Array.isArray(se.guests) ? se.guests : []).map(g => ({ ...normMember(g), guest: true }));
+  const ids = new Set([...s.members.map(m => m.id), ...guests.map(g => g.id)]);
+  const n = Math.max(1, Math.min(20, (Array.isArray(se.courts) && se.courts.length) || s.settings.courts));
+  const sess = { ...freshSession(n, s.settings.venues[0]), ...se };
+  sess.guests = guests; sess.ws = !!se.ws; sess.started = !!se.started; sess.attendConfirmed = !!se.attendConfirmed;
+  sess.maxAttend = Math.max(0, parseInt(se.maxAttend, 10) || 0);
+  sess.maleStreak = Math.max(0, parseInt(se.maleStreak, 10) || 0);
+  sess.rev = Math.max(0, parseInt(se.rev, 10) || 0);
+  sess.present = (sess.present || []).filter(id => ids.has(id));
+  sess.left = (sess.left || []).filter(id => ids.has(id));
+  const rawCheckedIn = Array.isArray(se.checkedIn) ? se.checkedIn : null;
+  let courts = Array.isArray(sess.courts) ? sess.courts : [];
+  courts = courts.slice(0, n).map(c => {
+    if (!c) return newCourt();
+    if (c.status === 'playing' && (!c.teams || !c.teams.flat().every(id => ids.has(id)))) return { ...newCourt(), manualType: c.manualType || null };
+    return { ...newCourt(), ...c };
+  });
+  while (courts.length < n) courts.push(newCourt());
+  sess.courts = courts;
+  const onCourt = new Set(courts.flatMap(c => c.status === 'playing' ? c.teams.flat() : []));
+  sess.present = [...new Set([...sess.present, ...onCourt])];
+  // Check-in：只有已 Check-in（依 Check-in 次序）先會入排序名單（queue）；出席但未 Check-in 唔會自動入隊。
+  // 舊資料冇 checkedIn 欄位時，當所有出席者已 Check-in，向下兼容。
+  sess.checkedIn = [...new Set((rawCheckedIn || sess.present).filter(id => sess.present.includes(id)))];
+  onCourt.forEach(id => { if (!sess.checkedIn.includes(id)) sess.checkedIn.push(id); });
+  sess.queue = [...new Set((sess.queue || []).filter(id => sess.checkedIn.includes(id) && !onCourt.has(id)))];
+  sess.checkedIn.forEach(id => { if (!onCourt.has(id) && !sess.queue.includes(id)) sess.queue.push(id); });
+  // 用 {...} 淺複製一個新物件，唔可以淨係 `sess[k] || {}`：雲端 db capability 讀返嚟嘅
+  // snapshot 資料，有機會係唔可以再加新屬性嘅（non-extensible／sealed，用嚟防止意外
+  // 修改快取）。如果直接攞住嗰個 snapshot 物件本身當做 state.session.wait／played／
+  // pairs／mates 嚟用，一旦有第一次出場嘅新選手（呢個物件入面未有佢個 id 嘅屬性），
+  // 之後 markPlaced()／recordResult() 想加一個新屬性落去就會即刻擲出
+  // 「Cannot add property ..., object is not extensible」，令個動作靜靜哋中斷咗一半
+  // （例如只有其中一位隊員嘅 wins 有記錄到、場地冇再重新編排）——呢個先係之前一連串
+  // 「撳咗個掣冇反應」報告嘅真正成因。而家一律用 {...} 起一個全新、正常可擴充嘅物件。
+  ['played', 'wait', 'pairs', 'mates'].forEach(k => { sess[k] = { ...(sess[k] || {}) }; });
+  s.session = sess;
+  return s;
+}
+function loadState() {
+  try { const r = localStorage.getItem(KEY); if (r) return normalize(JSON.parse(r)); } catch (e) {}
+  try { // 由舊版遷移會員名單
+    const o = localStorage.getItem(OLD_KEY);
+    if (o) { const p = JSON.parse(o); return normalize({ members: p.members, settings: p.settings }); }
+  } catch (e) {}
+  return freshState();
+}
+// ---- 雲端資料庫（Claude Artifact db capability）----
+// 有 db 可用時，資料唔再靠 localStorage／本機檔案，改為存喺呢個 Artifact 專用嘅雲端資料庫度，
+// 咁樣只要用返同一個網址（喺 Safari／Chrome 打開），任何裝置都見到同一份資料，唔會因為
+// iPad 打開方式唔同（例如喺 Claude 入面打開，而唔係 Safari）而令 localStorage 清空。
+let dbApi = null;
+let downloadsApi = null;
+let booting = true;
+const LOG_PERSIST_CAP = 300;      // 存入雲端嘅 log 上限（記憶體內仍然可以去到 1000 筆）
+const ACTIVITIES_PERSIST_LIMIT = 100;
+let saveTimer = null;
+function localSave() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+// 每次有改動就遞增 rev（版本號），等即時同步（onSnapshot）可以分辨「呢個雲端快照係咪
+// 真係新過本機」——避免一個過時／慢咗先送到嘅快照，將本機啱啱做嘅改動（例如 Check-in）蓋走。
+function save() {
+  state.session.rev = (+state.session.rev || 0) + 1;
+  state.settings.rev = (+state.settings.rev || 0) + 1;
+  localSave(); // 一律都寫一份落 localStorage，做埋離線後備
+  if (!dbApi) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; flushDb(); }, 600);
+}
+function flushDb() {
+  if (!dbApi) return;
+  const core = { members: state.members, settings: state.settings };
+  const logSlice = state.log.slice(0, LOG_PERSIST_CAP);
+  Promise.all([
+    dbApi.doc('app/core').set(core),
+    dbApi.doc('app/session').set({ session: state.session }),
+    dbApi.doc('app/log').set({ log: logSlice }),
+  ]).catch(() => {});
+}
+async function saveNewActivityToDb(activity) {
+  if (!dbApi) return;
+  try { await dbApi.collection('activities').doc(activity.id).set(activity); } catch (e) {}
+}
+// ---- 即時同步（多部裝置）----
+// 之前個版本只喺開 App 嗰陣讀一次雲端資料，之後每部裝置各自畫自己個畫面，完全冇互通：
+// 喺場地枱裝置撳 Check-in，管理員枱裝置（或者第二部）要重新載入先見到，睇落似「冇反應」，
+// 管理員模式同訪客模式（其實即係唔同裝置／分頁）都一樣有呢個問題。而家訂閱 app/session（活動
+// 即時狀態，包括 Check-in／排隊）同 app/core（會員／設定）嘅 onSnapshot，一有第二部裝置寫入
+// 就即時攞返嚟更新畫面，唔使人手重新整理。
+//
+// 版本號（rev）防止「慢／過時嘅快照」蓋走本機啱啱做嘅改動：
+// onSnapshot 一訂閱返，第一個送到嘅快照未必即時——可能仲係訂閱嗰一刻嘅舊資料，送到嘅時候
+// 本機可能已經（喺呢個快照都仲未反映到）做咗新改動（例如撳咗 Check-in）。如果淨係憑內容
+// 唔同就照單全收，就會將呢個「過時」快照嘅舊資料蓋返落本機，等於將啱啱撳嘅嘢「打番轉頭」，
+// 要等第二個（真正反映到最新寫入嘅）快照送到先會自我修正——變成好似要人手切換分頁先「返生」。
+// 而家每次 save() 都會遞增 rev；一個遠端快照嘅 rev 冇嚴格大過本機現有嘅 rev，就當佢係過時／
+// 冇資訊新意義，唔會覆蓋本機資料。
+let sessionUnsub = null, coreUnsub = null;
+function subscribeLive() {
+  if (!dbApi) return;
+  try {
+    sessionUnsub = dbApi.doc('app/session').onSnapshot(snap => {
+      if (booting || !snap.exists || snap.metadata.hasPendingWrites) return;
+      const data = snap.data();
+      const remote = data && data.session;
+      if (!remote) return;
+      const remoteRev = +remote.rev || 0, localRev = +state.session.rev || 0;
+      if (remoteRev <= localRev) return; // 唔係嚴格新過本機：可能係過時快照，或者係本機自己嗰次寫入嘅回聲，唔使處理
+      state = normalize({ members: state.members, settings: state.settings, session: remote, log: state.log, activities: state.activities });
+      render();
+    }, () => {});
+    coreUnsub = dbApi.doc('app/core').onSnapshot(snap => {
+      if (booting || !snap.exists || snap.metadata.hasPendingWrites) return;
+      const remote = snap.data();
+      if (!remote || !Array.isArray(remote.members)) return;
+      const remoteRev = +(remote.settings && remote.settings.rev) || 0, localRev = +(state.settings && state.settings.rev) || 0;
+      if (remoteRev <= localRev) return;
+      state = normalize({ members: remote.members, settings: remote.settings, session: state.session, log: state.log, activities: state.activities });
+      render();
+    }, () => {});
+  } catch (e) {}
+}
+async function initPersistence() {
+  try {
+    if (window.claude && typeof window.claude.use === 'function') {
+      dbApi = await window.claude.use('db');
+      window.claude.use('downloads').then(d => { downloadsApi = d; }).catch(() => {});
+    }
+  } catch (e) { dbApi = null; }
+  if (dbApi) {
+    try {
+      const [coreSnap, sessSnap, logSnap] = await Promise.all([
+        dbApi.doc('app/core').get(),
+        dbApi.doc('app/session').get(),
+        dbApi.doc('app/log').get(),
+      ]);
+      let acts = [];
+      try {
+        const q = await dbApi.collection('activities').orderBy('endedAt', 'desc').limit(ACTIVITIES_PERSIST_LIMIT).get();
+        acts = (q && q.docs ? q.docs : []).map(d => d.data());
+      } catch (e) {}
+      const core = coreSnap && coreSnap.exists ? coreSnap.data() : null;
+      if (core && Array.isArray(core.members)) {
+        const sess = sessSnap && sessSnap.exists ? sessSnap.data().session : null;
+        const logD = logSnap && logSnap.exists ? logSnap.data().log : null;
+        state = normalize({ members: core.members, settings: core.settings, session: sess, log: logD, activities: acts });
+      } else {
+        // 雲端仲未有資料（第一次用呢個網址）：試下由 localStorage 舊資料遷移一次過寫落雲端。
+        const legacy = loadState();
+        state = legacy;
+        flushDb();
+        if (state.activities && state.activities.length) {
+          state.activities.forEach(a => { if (a && a.id) saveNewActivityToDb(a); });
+        }
+      }
+    } catch (e) {
+      state = loadState();
+    }
+  } else {
+    state = loadState(); // 冇 db 可用（例如離線本機檔案），用返 localStorage
+  }
+  booting = false;
+  render();
+  // 再次停用：重新啟用之後，實測見到會有「舊雲端資料突然蓋返落嚟」嘅現象（畫面由 4 個場、
+  // 得 1 人 check 咗，突然變返 2 個場、2 人已 check——同用戶剛做嘅動作完全對唔上），懷疑係
+  // rev 判斷喺重置活動之後失效，令舊快照被誤判做「新過本機」。用戶本身只用單一部裝置，唔靠
+  // 呢個跨裝置同步功能，所以暫時停用返，避免再累事，專心追查 checkIn() 本身嘅 early-return 問題。
+  // subscribeLive();
+}
+
+let state = freshState();
+let tab = 'courts';
+// 開 App 首先顯示一個簡單主頁畫面（App 名稱＋版本號），撳「進入」先入返平時嘅畫面；
+// 呢個係純 UI 狀態，唔使亦唔會儲存（每次重新載入都會再顯示一次）。
+let splashDone = false;
+function dismissSplash() { splashDone = true; render(); }
+function splashView() {
+  return `<div class="splash">
+    <img src="${LOGO}" alt="HKSBC">
+    <h1>${esc(t('appName'))}</h1>
+    <div class="sub">${esc(CLUB)}</div>
+    <div class="ver">${esc(t('splashVersionLabel', APP_VERSION))}</div>
+    <button class="btn btn-primary" data-call="dismissSplash()">${esc(t('splashContinueBtn'))}</button>
+  </div>`;
+}
+const ui = { addGender: 'M', addGrade: 'B', addMixed: false, gGender: 'M', gGrade: 'B', gMixed: false, bulkOpen: false, edit: {}, swap: null, dialog: null, exportDoc: null,
+             trendMember: '', summaryMonth: '', newNameDraft: '', guestNameDraft: '',
+             adminMode: false, memberSort: 'name' };
+
+// ---- 自製對話框（取代 confirm/alert/prompt，避免在部分內嵌瀏覽器 [如 Documents] 內無反應）----
+function showAlert(msg) { ui.dialog = { type: 'alert', msg }; render(); }
+function showConfirm(msg, onYes) { ui.dialog = { type: 'confirm', msg, onYes }; render(); }
+function showPrompt(msg, onOk, opts) {
+  ui.dialog = { type: 'prompt', msg, onOk, value: (opts && opts.value) || '', inputType: (opts && opts.inputType) || 'text' };
+  render();
+  // autofocus 屬性喺 innerHTML 動態插入嘅內容上唔一定生效（尤其 iPad Safari），所以額外手動 focus 一次，
+  // 令彈出對話框即刻可以打字，唔使使用者要先撳一下輸入欄。
+  setTimeout(() => { const el = document.getElementById('dialogInput'); if (el) { el.focus(); el.select && el.select(); } }, 0);
+}
+function dialogCancel() { ui.dialog = null; render(); }
+function dialogYes() {
+  const d = ui.dialog; ui.dialog = null; render();
+  if (d && d.onYes) {
+    try { d.onYes(); } catch (e) { try { console.error('[HKSBC] dialog onYes failed:', e); } catch (e2) {} renderErrorFallback(e); }
+  }
+}
+function dialogOk() {
+  const d = ui.dialog; if (!d) return;
+  const el = document.getElementById('dialogInput'); const val = el ? el.value : '';
+  ui.dialog = null; render();
+  if (d.onOk) {
+    try { d.onOk(val); } catch (e) { try { console.error('[HKSBC] dialog onOk failed:', e); } catch (e2) {} renderErrorFallback(e); }
+  }
+}
+function dialogModal() {
+  const d = ui.dialog; if (!d) return '';
+  const msg = `<p>${esc(d.msg)}</p>`;
+  if (d.type === 'alert') {
+    return `<div class="modal-backdrop dialog-backdrop" data-call="if(event.target===this)dialogCancel()"><div class="modal dialog">
+      ${msg}<div class="modal-actions"><button class="btn btn-primary" data-call="dialogCancel()">${t('dlgOk')}</button></div>
+    </div></div>`;
+  }
+  if (d.type === 'confirm') {
+    return `<div class="modal-backdrop dialog-backdrop" data-call="if(event.target===this)dialogCancel()"><div class="modal dialog">
+      ${msg}<div class="modal-actions"><button class="btn btn-ghost" data-call="dialogCancel()">${t('dlgCancel')}</button><button class="btn btn-primary" data-call="dialogYes()">${t('dlgConfirm')}</button></div>
+    </div></div>`;
+  }
+  if (d.type === 'prompt') {
+    return `<div class="modal-backdrop dialog-backdrop" data-call="if(event.target===this)dialogCancel()"><div class="modal dialog">
+      ${msg}<input id="dialogInput" class="dialog-input" type="${d.inputType}" value="${esc(d.value)}" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();dialogOk();}">
+      <div class="modal-actions"><button class="btn btn-ghost" data-call="dialogCancel()">${t('dlgCancel')}</button><button class="btn btn-primary" data-call="dialogOk()">${t('dlgConfirm')}</button></div>
+    </div></div>`;
+  }
+  return '';
+}
+
+/* ---------- 工具 ---------- */
+const M = id => state.members.find(m => m.id === id) || state.session.guests.find(m => m.id === id);
+const games = m => m.wins + m.losses;
+const sm = m => (m.wins + 1) / (m.wins + m.losses + 2);          // 平滑勝率（排名用）
+const pct = m => games(m) ? Math.round(m.wins / games(m) * 100) + '%' : '—';
+const pairKey = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+const playing = () => new Set(state.session.courts.flatMap(c => c.status === 'playing' ? c.teams.flat() : []));
+const tonightCount = () => state.log.filter(l => l.night === state.session.night).length;
+const fmtDate = d => d ? d.replace(/-/g, '/') : '';
+const fmtDMY = d => { if (!d) return ''; const p = d.split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : d; };
+
+/* ---------- 實力排位 ---------- */
+// 男仕分 A/B/C 三級；女仕唔分實力組。三級之間唔再用「跨組」（尾N位/頭N位）咁樣橋接，
+// 改為固定嘅夾組規則（見 groupFits）：A 永遠淨係同 A 對打；B 係 A 同 C 之間嘅橋樑，
+// A 或 C 人數唔夠 4 人自己開場嗰陣，就夾 2 位 B 落去（一隊入面一位 A/C 配一位 B）；
+// B 自己人數夠都可以自己開場（B 對 B）。
+function buildInfo() {
+  const present = state.session.present.map(M).filter(Boolean);
+  const cmp = (a, b) => sm(b) - sm(a) || games(b) - games(a) || a.name.localeCompare(b.name);
+  const A = present.filter(m => m.gender === 'M' && m.grade === 'A').sort(cmp);
+  const B = present.filter(m => m.gender === 'M' && m.grade === 'B').sort(cmp);
+  const C = present.filter(m => m.gender === 'M' && m.grade === 'C').sort(cmp);
+  const W = present.filter(m => m.gender === 'F').sort(cmp);
+  const idx = {}; let pos = 0;
+  [A, B, C, W].forEach(list => {
+    let prev = null, pi = 0;
+    list.forEach(m => {
+      const r = sm(m);
+      if (prev === null || Math.abs(r - prev) > 1e-9) { pi = pos; prev = r; }
+      idx[m.id] = pi; pos++;
+    });
+  });
+  return { A, B, C, W, idx };
+}
+// 顯示用場地名稱（測試階段：連同 A/B/C 分組一併顯示，方便測試）。
+const TYPE_NAME = () => ({ A: t('typeA'), B: t('typeB'), C: t('typeC'), F: t('typeF'), G: t('typeG') });
+const SUBLABEL = () => ({ F1: t('subF1'), F2: t('subF2') });
+// 按實際／預計的男女組合，顯示「男雙場」「女雙場」「混雙場」（不透露背後的實力分組）。
+const formatLabel = ids => { const f = fCount(ids); if (f === 0) return t('courtMenDoubles'); if (f === ids.length) return t('courtWomenDoubles'); return t('courtMixedDoubles'); };
+// 場地類型：已 Check-in 女性 ≥ 4 人 → 保留一場給女子；A/B 場唔再固定保留（輪空名單第一位係邊組，
+// 自然會拉出同組排名最高嘅選手夾埋一齊打，無需人為劃定），管理員仍可人手覆蓋每個場的類型。
+// 用「已 Check-in」而非「出席」嚟計算，係因為女仕專場關乎緊排隊／落場，若女仕 Check-out
+// 令人數跌破 4 人，女子專場應即時取消，回復返「未夠 4 位女仕」嘅正常邏輯。
+//
+// 重要：邊一個場係「女仕專場」一定要有固定身份（`c.isWomenCourt`），唔可以每次淨係靠即時嘅
+// 女仕人數／場數「即場重新計算」邊個位置係女仕場。舊版本冇固定身份，會令：
+// (a) recordResult() 記錄結果嗰陣重新計算一次 courtTypes()，如果嗰一刻嘅人數/場數同編排嗰陣
+//     計出嚟嘅唔一致（哪怕只係好短暫嘅落差），個場會突然「唔再係」女仕場，令女雙/混1/混2
+//     嘅循環狀態（fSub）凍結或者亂咗，之後亂編；
+// (b) 有女仕正打緊嗰個場，如果因為人數/場數臨時嘅變化令個場喺某一刻計出嚟已經唔係 'F'，
+//     womenOnlyMode() 都會跟住變 false，令女仕突然對其他 G 場都「合資格」，混雙／組隊入面
+//     就可能整出唔啱嘅性別組合（例如一男三女），而且完全冇彈確認框提示。
+// 而家嘅做法：女仕場一經編排（fillCourt 入面標記 isWomenCourt=true）就固定喺嗰個場，唔會因為
+// 之後人數/場數嘅變化而中途「唔見咗」；只有喺嗰個場填唔到組合、而且即時女仕人數已經跌落 4 人
+// 以下，先會釋放返做普通場（安全閥，避免場地永久卡住）。人手覆蓋場地類型（setCourtType）或者
+// 個場重置（newCourt）都會清返呢個身份。
+// 場地安排（固定場數規則）：
+// ・場數少於 4 個：全部場都唔會預留，跟返各組別即時出席人數自然編排（全部 'G'）。
+// ・場數 4 個或以上：1 號場（index 0）預留畀女仕專場（出席女仕 4 人或以上先生效）；
+//   3 號場（index 2）預留畀全男 A 組（純 A，唔理女仕人數）。兩個預留互不重疊，管理員人手
+//   指定場地類型（manualType）仍然可以覆蓋呢兩個預留。
+function courtTypes() {
+  const n = state.session.courts.length, base = Array(n).fill('G');
+  const courts = state.session.courts;
+  if (n >= 4) {
+    const f = state.session.checkedIn.map(M).filter(m => m && m.gender === 'F').length;
+    const pinned = courts.findIndex(c => c.isWomenCourt && c.status !== 'closed');
+    if (pinned >= 0) {
+      base[pinned] = 'F';
+    } else if (f >= 4 && !courts[0].manualType && courts[0].status !== 'closed') {
+      base[0] = 'F';   // 1 號場：女仕專場
+    }
+    if (base[2] !== 'F' && !courts[2].manualType) base[2] = 'A';   // 3 號場：全男 A 組
+  }
+  return state.session.courts.map((c, i) => c.manualType ? c.manualType : base[i]);
+}
+// 女仕專場運作：女雙 → 混1 → 混2 → 女雙…如此類推。
+// 女雙每次都由輪候名單中「按次序」（排得越前，即輪空越耐）公平重新揀 4 位女仕（若女仕多過 4 位，
+// 每次未必揀到同一組合），配對由正常嘅組隊邏輯決定；混1 固定係女雙嘅贏方兩位，各自配一位男仕；
+// 混2 唔強制一定係女雙嘅輸方——同女雙一樣，係喺當其時嘅輪候名單中，輪空優先（同分隨機／按成本）
+// 重新公平揀 2 位女仕，所以有可能係原本嘅輸方，亦有可能係另一位輪咗更耐嘅女仕。
+// c.fSub：0 = 女雙（下一局／依家局），1 = 混1，2 = 混2，3 = 男雙（一個女雙／混1／混2循環完咗之後，
+// 插一場男雙先至再開始第二個循環）；c.fWinPair：最近一局女雙嘅贏方（供混1 用）。
+function pickType(i, types) {
+  if (types[i] !== 'F') return types[i];
+  const c = state.session.courts[i];
+  const sub = c.fSub || 0;
+  if (sub === 0) return 'F1';
+  if (sub === 3) return 'G';
+  return 'F2';
+}
+// 當出席女仕夠 4 位、已編有女仕專場（F 場）時，女仕只會喺女仕專場輪候／出場，
+// 不會再落其他（G）場——包括其他場嘅混雙。女仕專場自己嘅混雙輪（F2）唔受此限制。
+function womenOnlyMode() { return courtTypes().includes('F'); }
+function eligible(id, type, info) {
+  const m = M(id); if (!m) return false;
+  // 女性會員唔分實力組，所以 A/B/C 場都淨係男性（A/B/C 係男仕專屬嘅實力分級）；女仕淨係打女子場／混雙／公開場。
+  if (type === 'A') return m.gender === 'M' && m.grade === 'A';
+  if (type === 'B') return m.gender === 'M' && m.grade === 'B';
+  if (type === 'C') return m.gender === 'M' && m.grade === 'C';
+  if (type === 'F' || type === 'F1') return m.gender === 'F';
+  if (type === 'G' && m.gender === 'F' && womenOnlyMode()) return false; // 有女仕專場時，女仕只喺女仕專場輪候
+  return true; // 'F2'、'G'（冇女仕專場時）：任何人（組合是否合規由 groupFits 判斷）
+}
+// 男女組合：只可四男（男雙）、四女（女雙）、二男二女（混雙，每隊一男一女）；不會出現三男一女
+const fCount = ids => ids.filter(id => M(id).gender === 'F').length;
+const genderOk = ids => { const f = fCount(ids); return f === 0 || f === 2 || f === 4; };
+// 男仕實力分組（A/B/C）夾組規則：
+// ・全 A、全 B、全 C 都可以（各自對打）；
+// ・A 永遠淨係同 A 對打，唔會同其他組別混埋（包括唔會同女仕混雙）；
+// ・B 係 A 同 C 之間嘅橋樑：A 或 C 唔夠 4 人自己開場嗰陣，可以各自夾 2 位 B 頂住
+//   （2A+2B 或 2C+2B），但唔可以 A、C 直接夾埋（中間一定要有 B 搭橋，或者各自對打）；
+//   B 自己人數夠 4 人，都可以純 B 對 B。
+function validMaleGrades(ids) {
+  const counts = { A: 0, B: 0, C: 0 };
+  ids.forEach(id => { const g = M(id).grade; counts[g] = (counts[g] || 0) + 1; });
+  if (counts.A === 4 || counts.B === 4 || counts.C === 4) return true;          // 純一組
+  if (counts.A === 2 && counts.B === 2 && counts.C === 0) return true;          // A+B 橋接
+  if (counts.C === 2 && counts.B === 2 && counts.A === 0) return true;          // C+B 橋接
+  return false;
+}
+// 男仕橋接組（2A+2B 或 2C+2B）入面，每隊一定要係一位 A/C 配一位 B，唔可以夾成 2A 對 2B。
+function teamGradesOk(teams) {
+  const grade = id => M(id).grade;
+  const g = teams.flat().map(grade), counts = {}; g.forEach(x => counts[x] = (counts[x] || 0) + 1);
+  const isBridge = (counts.A === 2 && counts.B === 2) || (counts.C === 2 && counts.B === 2);
+  if (!isBridge) return true;
+  return teams.every(t => grade(t[0]) !== grade(t[1]));
+}
+const teamsOk = teams => {
+  const all = teams.flat();
+  if (!genderOk(all)) return false;
+  const f = fCount(all);
+  if (f === 2) return teams.every(t => fCount(t) === 1);   // 混雙：每隊一男一女
+  if (f === 0) return validMaleGrades(all) && teamGradesOk(teams);  // 全男：跟返 A/B/C 夾組規則
+  return true;  // 全女（女仕專場）
+}
+function groupFits(ids, type, info) {
+  if (!genderOk(ids)) return false;
+  if (type === 'A') return ids.every(id => M(id).gender === 'M' && M(id).grade === 'A');
+  if (type === 'B') return ids.every(id => M(id).gender === 'M' && M(id).grade === 'B');
+  if (type === 'C') return ids.every(id => M(id).gender === 'M' && M(id).grade === 'C');
+  if (type === 'F' || type === 'F1') return ids.every(id => M(id).gender === 'F');
+  if (type === 'F2') return fCount(ids) === 2;
+  if (type === 'G') {
+    const f = fCount(ids);
+    if (f === 2) return ids.filter(id => M(id).gender === 'M').every(id => M(id).grade !== 'A'); // 女混：A 永遠唔參與
+    if (f === 0) return validMaleGrades(ids);
+    return true;
+  }
+  return true;
+}
+// 混雙：一男一女同隊時，雙方都應「適合混雙」
+const mixPen = t => { const x = M(t[0]), y = M(t[1]); return (x.gender !== y.gender && !(x.mixed && y.mixed)) ? 1 : 0; };
+const splitsOf = ids => { const [a, b, c, d] = ids; return [[[a, b], [c, d]], [[a, c], [b, d]], [[a, d], [b, c]]]; };
+function allowedSplits(ids) {
+  if (fCount(ids) === 2) return splitsOf(ids).filter(o => o.every(t => fCount(t) === 1));
+  if (fCount(ids) === 0) {
+    const grade = id => M(id).grade, counts = {}; ids.forEach(id => counts[grade(id)] = (counts[grade(id)] || 0) + 1);
+    const isBridge = (counts.A === 2 && counts.B === 2) || (counts.C === 2 && counts.B === 2);
+    if (isBridge) return splitsOf(ids).filter(o => o.every(t => grade(t[0]) !== grade(t[1])));
+  }
+  return splitsOf(ids);
+}
+function splitScore(o, info) {
+  const s = t => t.reduce((x, id) => x + (info.idx[id] ?? 0), 0);
+  const mates = t => state.session.mates[pairKey(t[0], t[1])] || 0;
+  return Math.abs(s(o[0]) - s(o[1])) + 0.6 * (mates(o[0]) + mates(o[1])) + 6 * (mixPen(o[0]) + mixPen(o[1]));
+}
+function groupCost(ids, info, q) {
+  let lo = Infinity, hi = -Infinity;
+  ids.forEach(id => { const v = info.idx[id] ?? 0; lo = Math.min(lo, v); hi = Math.max(hi, v); });
+  let c = hi - lo;                                                    // 勝率（排位）差距
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++)
+    c += 0.6 * (state.session.pairs[pairKey(ids[i], ids[j])] || 0);  // 避免重複同場
+  c += Math.min(...allowedSplits(ids).map(o => 6 * (mixPen(o[0]) + mixPen(o[1]))));  // 混雙適合度
+  ids.forEach(id => { const p = q.indexOf(id); if (p >= 0) c += 0.15 * p; });   // 偏好排得前的人
+  return c;
+}
+// 判斷兩個女仕配對是否完全一樣（唔理次序）——用嚟確保混1配對唔可以同上個循環完全相同
+function pairEq(a, b) {
+  if (!a || !b || a.length !== 2 || b.length !== 2) return false;
+  return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+}
+function bestCombo(anchor, cand, k, fixed, info, q, type, requireFemale, opts) {
+  const avoidPair = opts && opts.avoidPair;
+  let best = null;
+  const base = [...fixed, anchor];
+  (function rec(start, chosen) {
+    if (chosen.length === k) {
+      const ids = [...base, ...chosen];
+      if (!groupFits(ids, type, info)) return;
+      if (requireFemale && fCount(ids) < 2) return;   // 全場輪替：強制呢一組要有女性（女雙或混雙）
+      if (avoidPair) {   // 女仕專場混1：呢組嘅女仕配對唔可以同上個循環嘅混1完全一樣
+        const fem = ids.filter(id => M(id).gender === 'F');
+        if (fem.length === 2 && pairEq(fem, avoidPair)) return;
+      }
+      if (fixed.length === 2 && !teamsOk([fixed, [anchor, ...chosen]])) return;   // 留場隊伍固定，挑戰隊伍須符合男雙/女雙/混雙
+      const c = groupCost(ids, info, q);
+      if (!best || c < best.cost) best = { cost: c, rest: [...chosen] };
+      return;
+    }
+    for (let i = start; i < cand.length; i++) { chosen.push(cand[i]); rec(i + 1, chosen); chosen.pop(); }
+  })(0, []);
+  return best;
+}
+// 從隊伍揀出一組（fixed = 已固定留場的選手；type = 場地類型，包括 F1/F2 子模式；
+// opts.requireFemale = true 時，只接受有女性（≥2 人）嘅組合——用於「全場輪替」強制安排女子組；
+// opts.excludeIds = 呢一輪唔可以揀嘅人（女仕專場混2：混1嘅兩位女仕要走）；
+// opts.avoidPair = 呢一組嘅女仕配對唔可以同呢個陣列完全一樣（女仕專場混1：唔可以同上個循環嘅混1完全相同）
+function pickGroup(fixed, type, opts) {
+  const requireFemale = !!(opts && opts.requireFemale);
+  const excludeIds = (opts && opts.excludeIds) || [];
+  const info = buildInfo(), q = state.session.queue.filter(id => eligible(id, type, info) && !excludeIds.includes(id)), need = 4 - fixed.length, W = 12;
+  if (q.length < need) return null;
+  for (let a = 0; a < q.length; a++) {
+    const anchor = q[a], others = q.filter((_, i) => i !== a);
+    for (const lim of [W, others.length]) {
+      const best = bestCombo(anchor, others.slice(0, lim), need - 1, fixed, info, q, type, requireFemale, opts);
+      if (best) return { ids: [...fixed, anchor, ...best.rest], info };
+      if (lim >= others.length) break;
+    }
+  }
+  return null;
+}
+// 規則備援：輪候名單夠 4 人，但夾唔出全A / 全B / A、B 跨組 / 全女 / 混雙嘅合規組合時，
+// 就放寬 A/B 分組限制，索性夾一組全男雙頂住，唔好閒置場地。
+function bestComboAny(anchor, cand, k, fixed, info, q) {
+  let best = null;
+  const base = [...fixed, anchor];
+  (function rec(start, chosen) {
+    if (chosen.length === k) {
+      const ids = [...base, ...chosen];
+      const c = groupCost(ids, info, q);
+      if (!best || c < best.cost) best = { cost: c, rest: [...chosen] };
+      return;
+    }
+    for (let i = start; i < cand.length; i++) { chosen.push(cand[i]); rec(i + 1, chosen); chosen.pop(); }
+  })(0, []);
+  return best;
+}
+function pickGroupMaleFallback(fixed, type) {
+  const info = buildInfo();
+  const q = state.session.queue.filter(id => { const m = M(id); return m && m.gender === 'M'; });
+  const need = 4 - fixed.length, W = 12;
+  if (q.length < need) return null;
+  for (let a = 0; a < q.length; a++) {
+    const anchor = q[a], others = q.filter((_, i) => i !== a);
+    for (const lim of [W, others.length]) {
+      const best = bestComboAny(anchor, others.slice(0, lim), need - 1, fixed, info, q);
+      if (best) return { ids: [...fixed, anchor, ...best.rest], info };
+      if (lim >= others.length) break;
+    }
+  }
+  return null;
+}
+function splitTeams(ids, info) {
+  let best = null, bc = Infinity;
+  allowedSplits(ids).forEach(o => {
+    const c = splitScore(o, info) + Math.random() * 0.01;
+    if (c < bc) { bc = c; best = o; }
+  });
+  return best;
+}
+
+/* ---------- 場地操作 ---------- */
+function markPlaced(ids) { ids.forEach(id => { state.session.wait[id] = 0; }); }
+// 全場輪替計數：呢一組有女性（女雙/混雙）就歸零，冇女性（男雙）就 +1。
+// 用嚟追蹤「連續幾多局冇女性參與」，達到設定門檻就會喺下次編排強制優先夾一組有女性嘅組合。
+function noteGenderStreak(ids) {
+  const s = state.session;
+  // A 組場（任何一位男仕係 A 組）永遠唔會同女仕混雙，所以完全唔應該計入／影響呢個「幾耐冇女仕」嘅計數器——
+  // 呢個計數器只反映 B／C 場嘅情況（見 forceWomenEveryN 設定同 fillCourt 嘅使用方式）。
+  if (ids.some(id => { const m = M(id); return m && m.gender === 'M' && m.grade === 'A'; })) return;
+  s.maleStreak = fCount(ids) > 0 ? 0 : (s.maleStreak || 0) + 1;
+}
+// 女仕專場：一般情況一個循環係女雙／混1／混2 三種局；但女仕人數係 4 位或以上、少於 6 位時，
+// 一個循環（女雙／混1／混2）完咗之後，會插一場男雙（c.fSub：0=女雙，1=混1，2=混2，3=男雙）
+// 先至再開始第二個循環。女仕夠 6 位或以上就唔使插男雙，直接接連做落一個循環。
+// 【啱啱好 4 位已 Check-in 女仕，冇替補】：呢 4 位（A/B/C/D）用固定嘅 3 種配對循環
+// AB|CD → AC|BD → AD|BC → AB|CD…（c.fFourIds／c.fFourIdx 記住依家去到邊種配對）；
+// 混1／混2 唔理輸贏，淨係跟返女雙嗰兩隊邊隊排先：隊一（c.fPairA）做混1，隊二（c.fPairB）做混2，
+// 各自配一位男仕。
+// 【多過 4 位女仕】：女雙、混2 每次都係喺當其時嘅輪候名單中重新公平揀（並非固定一組人循環）；
+// 混1 優先揀「未打過（唔屬於啱啱嗰局女雙四位）」嘅女仕嚟頂替：有 2 位或以上就完全用替補重新揀，
+// 淨返 1 位就用嗰位＋隨便一位女雙贏方（隨機）配搭，一位都冇就跟返女雙嘅兩位贏方（保護性 fallback）。
+// 男雙（sub 3）：淨係喺輪候名單公平揀 4 位男仕，同任何一個普通 G 場冇分別。
+// c.fSub 喺呢個函數入面唔會變（代表「而家／即將」嘅局種），真正嘅局種推進喺 recordResult() 嗰局完場後先做。
+function fillFemaleCourt(i) {
+  const s = state.session, c = s.courts[i];
+  const sub = c.fSub || 0;
+  const totalWomen = s.checkedIn.filter(id => { const m = M(id); return m && m.gender === 'F'; }).length;
+  if (sub === 0) {
+    // 女雙：由輪候名單公平揀 4 位女仕（輪空越耐、排得越前越優先）。
+    const p = pickGroup([], 'F1');
+    if (!p) return false;
+    s.queue = s.queue.filter(id => !p.ids.includes(id));
+    c.status = 'playing'; c.stay = 0; c.num = ++s.counter; c.startedAt = Date.now();
+    if (totalWomen === 4) {
+      // 固定 4 人：配對跟返 AB|CD → AC|BD → AD|BC 嘅循環，唔用隨機／成本揀配對。
+      const sorted = [...p.ids].sort();
+      const sameFour = c.fFourIds && c.fFourIds.length === 4 && sorted.every(id => c.fFourIds.includes(id));
+      const idx = sameFour ? ((c.fFourIdx || 0) + 1) % 3 : 0;
+      c.fFourIds = sorted; c.fFourIdx = idx;
+      const [p0, p1, p2, p3] = sorted;
+      const splits = [[[p0, p1], [p2, p3]], [[p0, p2], [p1, p3]], [[p0, p3], [p1, p2]]];
+      c.teams = splits[idx];
+    } else {
+      c.fFourIds = null; c.fFourIdx = 0;
+      c.teams = splitTeams(p.ids, p.info);
+    }
+    markPlaced(p.ids); noteGenderStreak(p.ids);
+    return true;
+  }
+  if (sub === 1) {
+    let p = null;
+    if (totalWomen === 4 && c.fPairA && c.fPairA.length === 2) {
+      // 啱啱好 4 位女仕：唔理輸贏，跟返女雙嗰兩隊嘅「隊一」做混1（各自配一位男仕）。
+      p = pickGroupMaleFallback(c.fPairA, 'F2');
+    } else {
+      // 優先揀未打過（唔屬於上一局女雙四位）嘅女仕；淨返 1 位替補就配 1 位女雙贏方（隨機挑一位）；
+      // 冇替補就跟返女雙嘅兩位贏方（保護性 fallback，理論上呢個分支只會喺 totalWomen 唔係 4 時行到）。
+      const winPair = c.fWinPair;
+      if (!winPair || winPair.length !== 2) { c.fSub = 0; return fillFemaleCourt(i); }   // 保護：資料唔齊就由女雙重新嚟過
+      const quad = (c.fQuad && c.fQuad.length === 4) ? c.fQuad : winPair;
+      const spares = s.queue.filter(id => { const m = M(id); return m && m.gender === 'F' && !quad.includes(id); });
+      // 注意：呢兩位女仕最終會分開喺兩隊混雙度（各自配一位男仕），唔係同一隊，所以夾組合呢一步
+      // 一定要用 pickGroupMaleFallback（唔限制邊種組合先合規，淨係揀最襯嘅男仕），
+      // 真正邊個同邊個一隊由之後嘅 splitTeams() 決定。
+      if (spares.length >= 2) {
+        // 兩位或以上未打過嘅女仕：喺呢班替補入面公平重新揀 2 位，完全唔用返女雙嘅人。
+        p = pickGroup([], 'F2', { requireFemale: true, excludeIds: quad });
+      }
+      if (!p) {
+        const fixedPair = spares.length === 1 ? [spares[0], winPair[Math.random() < 0.5 ? 0 : 1]] : winPair;
+        p = pickGroupMaleFallback(fixedPair, 'F2');
+      }
+    }
+    if (!p) return false;
+    s.queue = s.queue.filter(id => !p.ids.includes(id));
+    c.status = 'playing'; c.teams = splitTeams(p.ids, p.info); c.stay = 0; c.num = ++s.counter; c.startedAt = Date.now();
+    markPlaced(p.ids); noteGenderStreak(p.ids);
+    return true;
+  }
+  if (sub === 2) {
+    // 混2
+    let p;
+    if (totalWomen === 4 && c.fPairB && c.fPairB.length === 2) {
+      // 啱啱好 4 位女仕：跟返女雙嗰兩隊嘅「隊二」做混2（各自配一位男仕）。
+      p = pickGroupMaleFallback(c.fPairB, 'F2');
+    } else {
+      // 唔強制一定係女雙嘅輸方——同女雙一樣，喺當其時嘅輪候名單重新公平揀 2 位女仕 + 2 位男仕
+      // （輪空優先，同分嘅由正常組隊成本決定）。
+      p = pickGroup([], 'F2');
+      if (!p) p = pickGroupMaleFallback([], 'F2');
+    }
+    if (!p) return false;
+    s.queue = s.queue.filter(id => !p.ids.includes(id));
+    c.status = 'playing'; c.teams = splitTeams(p.ids, p.info); c.stay = 0; c.num = ++s.counter; c.startedAt = Date.now();
+    markPlaced(p.ids); noteGenderStreak(p.ids);
+    return true;
+  }
+  // 男雙（sub === 3）：一個循環（女雙／混1／混2）打完之後，喺開始第二個循環之前，先安排一場男雙——
+  // 完全喺輪候名單入面公平揀 4 位男仕（女仕喺 womenOnlyMode 底下本身就冇資格打 G 類型，天然全男）。
+  let p = pickGroup([], 'G');
+  if (!p) p = pickGroupMaleFallback([], 'G');
+  if (!p) return false;
+  s.queue = s.queue.filter(id => !p.ids.includes(id));
+  c.status = 'playing'; c.teams = splitTeams(p.ids, p.info); c.stay = 0; c.num = ++s.counter; c.startedAt = Date.now();
+  markPlaced(p.ids); noteGenderStreak(p.ids);
+  return true;
+}
+function fillCourt(i) {
+  const s = state.session, c = s.courts[i];
+  if (!c || c.status !== 'idle') return false;
+  let types = courtTypes();
+  if (types[i] === 'F') {
+    c.isWomenCourt = true;   // 呢個場一經編排做女仕場，身份就固定落嚟，唔會因為之後人數/場數變化而中途「唔見咗」
+    if (fillFemaleCourt(i)) return true;
+    // 填唔到（例如夾唔出合規組合）：如果即時女仕人數已經跌落 4 人以下，先釋放呢個場返做普通場，
+    // 避免場地因為一個已經冇資格再保留嘅女仕身份而永久卡住；如果女仕仲夠 4 人，就保留身份、
+    // 等下次輪候名單有變再試（唔搶佢去做普通場，避免女仕場「被消失」）。
+    const fNow = s.checkedIn.map(M).filter(m => m && m.gender === 'F').length;
+    if (fNow >= 4) return false;
+    c.isWomenCourt = false;
+    types = courtTypes();
+  }
+  const pt = pickType(i, types);
+  const forceN = +state.settings.forceWomenEveryN || 0;
+  // 全場輪替：連續 N 局冇女性之後，優先搵一組有女性嘅組合；搵唔到就照舊正常編排（唔會令場地閒置等女性）。
+  // A 場永遠唔會夾女仕（A 組唔同女仕混雙），所以 pt 係 'A' 嗰陣完全唔使嘗試呢個強制安排。
+  let p = (forceN > 0 && pt !== 'A' && (s.maleStreak || 0) >= forceN) ? pickGroup([], pt, { requireFemale: true }) : null;
+  if (!p) p = pickGroup([], pt);
+  if (!p) p = pickGroupMaleFallback([], pt);
+  if (!p) return false;
+  s.queue = s.queue.filter(id => !p.ids.includes(id));
+  c.status = 'playing'; c.teams = splitTeams(p.ids, p.info); c.stay = 0; c.num = ++s.counter; c.startedAt = Date.now();
+  markPlaced(p.ids);
+  noteGenderStreak(p.ids);
+  return true;
+}
+function fillIdle(first) {
+  const types = courtTypes(), order = [];
+  if (first != null) order.push(first);
+  const rest = state.session.courts.map((_, i) => i).filter(i => i !== first);
+  rest.sort((a, b) => (types[a] === 'G') - (types[b] === 'G'));       // 保留場優先
+  order.push(...rest);
+  order.forEach(i => fillCourt(i));
+}
+function recordResult(i, w) {
+  const s = state.session, c = s.courts[i];
+  if (!c || c.status !== 'playing') return;
+  const win = c.teams[w], lose = c.teams[1 - w];
+  win.forEach(id => { const m = M(id); if (m) m.wins++; s.played[id] = (s.played[id] || 0) + 1; });
+  lose.forEach(id => { const m = M(id); if (m) m.losses++; s.played[id] = (s.played[id] || 0) + 1; });
+  const all = c.teams.flat();
+  for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) { const k = pairKey(all[a], all[b]); s.pairs[k] = (s.pairs[k] || 0) + 1; }
+  c.teams.forEach(t => { const k = pairKey(t[0], t[1]); s.mates[k] = (s.mates[k] || 0) + 1; });
+  s.queue.forEach(id => { s.wait[id] = (s.wait[id] || 0) + 1; });     // 輪空局數
+  // 記低呢一局由編排完（c.startedAt）到完結（而家）用咗幾耐，用嚟學習「平均每場耗時」，
+  // 過濾明顯唔合理嘅數值（例如頁面開住成晚冇按完場，唔計落平均數）。
+  const durationMs = (c.startedAt && Date.now() > c.startedAt) ? (Date.now() - c.startedAt) : null;
+  state.log.unshift({
+    id: uid(), time: Date.now(), night: s.night, date: s.date, venue: s.venue, court: i + 1, num: c.num,
+    teams: [[...c.teams[0]], [...c.teams[1]]],
+    names: c.teams.map(t => t.map(id => (M(id) || {}).name || '?')), winner: w, durationMs
+  });
+  state.log = state.log.slice(0, 1000);
+
+  // 女仕專場自己有固定嘅運作方式（女雙→混1→混2→…），唔適用 Winner Stay；
+  // 呢度先推進局種：女雙啱啱完場就記低邊方贏（比之後嘅混1 用），混1／混2 完場就推進去下一個局種。
+  const types = courtTypes();
+  if (types[i] === 'F') {
+    const sub = c.fSub || 0;
+    if (sub === 0) {
+      c.fWinPair = [...win];
+      c.fQuad = [...win, ...lose].filter(id => M(id) && M(id).gender === 'F');
+      c.fPairA = [...c.teams[0]]; c.fPairB = [...c.teams[1]];   // 隊一／隊二（唔理輸贏），供啱啱好 4 位女仕嗰個情況用
+      c.fSub = 1;
+    }
+    else if (sub === 1) { c.fSub = 2; }
+    else if (sub === 2) {
+      // 女仕 4 位或以上但少於 6 位時：一個循環（女雙／混1／混2）完咗，插一場男雙先至再開始第二個循環；
+      // 女仕夠 6 位或以上就唔使插，直接返去女雙開始下一個循環。
+      const totalWomen = s.checkedIn.filter(id => { const m = M(id); return m && m.gender === 'F'; }).length;
+      c.fSub = (totalWomen >= 4 && totalWomen < 6) ? 3 : 0;
+    }
+    else { c.fSub = 0; }
+  }
+  // 負方先排隊（納入候選池），如已人手開啟 Winner Stay，A 組勝方留場（連續留場局數不能多於設定上限）；
+  // 若勝方冇留場，重新排隊時勝方會排先於負方，令佢哋更快再上場
+  s.queue.push(...lose);
+  let stayed = false;
+  const st = state.settings;
+  if (types[i] !== 'F' && !c.closing && s.ws && win.every(id => M(id) && M(id).grade === 'A') && (!+st.wsMax || (c.stay + 1) < +st.wsMax)) {
+    const pt = pickType(i, types);
+    const p = pickGroup(win, pt);
+    if (p) {
+      const ch = p.ids.filter(id => !win.includes(id));
+      s.queue = s.queue.filter(id => !ch.includes(id));
+      c.teams = [[...win], ch]; c.stay++; c.num = ++s.counter; c.startedAt = Date.now(); stayed = true;
+      markPlaced(ch);
+      noteGenderStreak(p.ids);
+    }
+  }
+  if (!stayed) {
+    s.queue = s.queue.filter(id => !lose.includes(id));
+    s.queue.push(...win, ...lose);
+    if (c.closing) { c.status = 'closed'; c.teams = null; c.stay = 0; c.num = 0; c.closing = false; }
+    else { c.status = 'idle'; c.teams = null; c.stay = 0; c.num = 0; fillIdle(i); }
+  } else fillIdle(null);
+  delete ui.edit[i];
+  save(); render();
+}
+function toggleWS() { state.session.ws = !state.session.ws; save(); render(); }
+function cancelCourt(i) {
+  const s = state.session, c = s.courts[i];
+  if (!c || c.status !== 'playing') return;
+  s.queue = [...c.teams.flat(), ...s.queue];
+  s.courts[i] = { ...newCourt(), manualType: c.manualType || null }; delete ui.edit[i];
+  save(); render();
+}
+// 完結此場：空場即時完結；進行中的場地會標記「本局後停用」，該局完結後才真正停用，
+// 且該局完結後不會再編排新對戰（即使 Winner Stay 已開啟也不會留場）。
+function closeCourt(i) {
+  const c = state.session.courts[i];
+  if (!c || c.status === 'closed') return;
+  if (c.status === 'playing') { c.closing = true; save(); render(); return; }
+  c.status = 'closed'; save(); render();
+}
+function cancelClosing(i) {
+  const c = state.session.courts[i];
+  if (c && c.status === 'playing') { c.closing = false; save(); render(); }
+}
+function reopenCourt(i) {
+  const c = state.session.courts[i];
+  if (!c || c.status !== 'closed') return;
+  c.status = 'idle'; save(); render();
+}
+function setCourtType(i, type) {
+  const c = state.session.courts[i];
+  if (!c || c.status !== 'idle') return;
+  c.manualType = (type === 'auto') ? null : type;
+  c.fSub = 0; c.fWinPair = null; c.fQuad = null; c.fPairA = null; c.fPairB = null; c.fFourIds = null; c.fFourIdx = 0; c.isWomenCourt = false;
+  save(); render();
+}
+function allCourtsClosed() { return state.session.courts.every(c => c.status === 'closed'); }
+function manualFill(i) {
+  const c = state.session.courts[i];
+  if (c && c.status === 'closed') { showAlert(t('courtClosedAlert')); return; }
+  if (!fillCourt(i)) showAlert(t('fillFailSingle'));
+  save(); render();
+}
+function fillAllIdle() {
+  const before = state.session.courts.filter(c => c.status === 'playing').length;
+  fillIdle(null);
+  if (state.session.courts.filter(c => c.status === 'playing').length === before) showAlert(t('fillFailAll'));
+  save(); render();
+}
+function setCourts(n) {
+  n = Math.max(1, Math.min(20, n));
+  const s = state.session;
+  if (n < s.courts.length) {
+    if (s.courts.slice(n).some(c => c.status === 'playing')) { showAlert(t('reduceCourtsBlocked')); return; }
+    s.courts = s.courts.slice(0, n);
+  } else while (s.courts.length < n) s.courts.push(newCourt());
+  save(); render();
+}
+
+/* ---------- 手動更改對戰名單 ---------- */
+function toggleEdit(i) { ui.edit[i] = !ui.edit[i]; render(); }
+function openSwap(ci, pid) { ui.swap = { court: ci, pid }; render(); }
+function closeSwap() { ui.swap = null; render(); }
+function swapWithin(ci, a, b) {
+  const c = state.session.courts[ci];
+  const nt = c.teams.map(t => t.map(id => id === a ? b : id === b ? a : id));
+  const apply = () => { c.teams = nt; ui.swap = null; save(); render(); };
+  if (!teamsOk(nt)) { showConfirm(t('swapInvalidGenderConfirm'), apply); return; }
+  apply();
+}
+function replaceWith(ci, oldId, newId) {
+  const s = state.session, c = s.courts[ci];
+  const ids = c.teams.flat().map(x => x === oldId ? newId : x);
+  const types = courtTypes(), pt = pickType(ci, types);
+  const apply = () => {
+    const qi = s.queue.indexOf(newId);
+    if (qi < 0) return;
+    s.queue[qi] = oldId;                                              // 被剔除的人回到隊伍（頂替對方原本位置）
+    c.teams = c.teams.map(t => t.map(id => id === oldId ? newId : id));
+    s.wait[newId] = 0;
+    ui.swap = null; save(); render();
+  };
+  if (!groupFits(ids, pt, buildInfo())) { showConfirm(t('replaceInvalidConfirm'), apply); return; }
+  apply();
+}
+
+/* ---------- 出席 / 確認 / 開始活動 / 離開活動 ---------- */
+// 出席名單／日期／場地／人數上限一有改動，就當「未確認」，等「確認出席名單」掣重新彈返出嚟
+// （唔理活動係咪已經開始 —— 中途改咗名單都要俾管理員清楚見到掣，再撳一次先算數）。
+function touchAttend() { state.session.attendConfirmed = false; }
+function setDate(v) { if (v) { state.session.date = v; touchAttend(); save(); render(); } }
+function setVenue(v) { state.session.venue = (v || '').trim(); touchAttend(); save(); render(); }
+function setMaxAttend(v) { state.session.maxAttend = Math.max(0, parseInt(v, 10) || 0); touchAttend(); save(); render(); }
+const atMax = () => { const mx = +state.session.maxAttend; return mx > 0 && state.session.present.length >= mx; };
+// 確認出席：揀好出席人員後撳一下就直接確認＋轉去「活動」分頁。第一次確認會即時開始活動；
+// 活動已經開始之後，如果中途改咗出席名單（觸發咗 touchAttend），掣會重新出現，再撳一次
+// 一樣會確認＋轉返去活動分頁，等管理員可以清楚見到＋落實每次改動。
+function confirmAttend() {
+  if (!state.session.present.length) { showAlert(t('confirmAttendNeedOne')); return; }
+  const s = state.session;
+  s.attendConfirmed = true; s.started = true; tab = 'courts';
+  save(); render();
+}
+function startActivity() {
+  const s = state.session;
+  if (!s.attendConfirmed) { showAlert(t('startNeedConfirm')); return; }
+  if (s.started) return;
+  s.started = true; save(); tab = 'courts'; render();
+}
+function setPresent(id, on) {
+  const s = state.session;
+  if (on) {
+    if (!s.present.includes(id)) {
+      if (atMax()) { showAlert(t('maxAttendReached', s.maxAttend)); return render(); }
+      s.present.push(id);
+    }
+    s.left = s.left.filter(x => x !== id);
+    touchAttend(); save(); render();
+  } else {
+    if (playing().has(id)) { showConfirm(t('leavingWhilePlayingConfirm'), () => leaveActivity(id)); return render(); }
+    leaveActivity(id);
+  }
+}
+// Check-in：出席（present）唔會自動入排序隊，要按 Check-in 先會按 Check-in 次序入隊。
+function checkIn(id) {
+  const s = state.session;
+  if (!s.present.includes(id) || s.checkedIn.includes(id)) { render(); return; }
+  s.checkedIn.push(id); s.queue.push(id); s.wait[id] = 0;
+  save(); render();
+}
+function checkOut(id) {
+  const s = state.session;
+  if (playing().has(id)) { showAlert(t('checkOutBlockedAlert')); return; }
+  s.checkedIn = s.checkedIn.filter(x => x !== id); s.queue = s.queue.filter(x => x !== id);
+  save(); render();
+}
+function toggleCheckIn(id, on) { if (on) checkIn(id); else checkOut(id); }
+function leaveActivity(id) {
+  const s = state.session;
+  const ci = s.courts.findIndex(c => c.status === 'playing' && c.teams.flat().includes(id));
+  s.present = s.present.filter(x => x !== id); s.queue = s.queue.filter(x => x !== id); s.checkedIn = s.checkedIn.filter(x => x !== id);
+  if ((s.played[id] || 0) > 0 && !s.left.includes(id)) s.left.push(id);
+  if (ci >= 0) {
+    const types = courtTypes(), pt = pickType(ci, types), info = buildInfo(), c = s.courts[ci];
+    const rest = c.teams.flat().filter(x => x !== id);
+    const rep = s.queue.find(q => eligible(q, pt, info) && groupFits([...rest, q], pt, info));
+    if (rep) {
+      c.teams = c.teams.map(t => t.map(x => x === id ? rep : x));
+      s.queue = s.queue.filter(x => x !== rep); s.wait[rep] = 0;
+    } else {
+      s.queue = [...rest, ...s.queue]; s.courts[ci] = { ...newCourt(), manualType: c.manualType || null }; fillCourt(ci);
+    }
+  }
+  ui.swap = null; touchAttend(); save(); render();
+}
+// 按組別「全出席」：group 係 'A'/'B'/'C'（男仕分級）或 'F'（女子組），淨係將嗰個組別嘅會員設做出席，
+// 唔會郁其他組別已有嘅出席狀態（例如已按過「全A」，之後再按「全女」，A 組唔會被清走）。
+function allPresentGroup(group) {
+  const s = state.session; let skipped = 0;
+  const inGroup = m => group === 'F' ? m.gender === 'F' : (m.gender === 'M' && m.grade === group);
+  state.members.filter(inGroup).forEach(m => {
+    if (s.present.includes(m.id)) return;
+    if (atMax()) { skipped++; return; }
+    s.present.push(m.id); s.left = s.left.filter(x => x !== m.id);
+  });
+  touchAttend(); save(); render();
+  if (skipped) showAlert(t('allPresentSkipped', s.maxAttend, skipped));
+}
+function nonePresent() {
+  const apply = () => { const pl = playing(), s = state.session; s.present = s.present.filter(id => pl.has(id)); s.checkedIn = s.checkedIn.filter(id => pl.has(id)); s.queue = []; touchAttend(); save(); render(); };
+  if (playing().size) { showConfirm(t('clearAttendConfirm'), apply); return; }
+  apply();
+}
+function moveQ(id, d) {
+  const q = state.session.queue, i = q.indexOf(id), j = i + d;
+  if (i < 0 || j < 0 || j >= q.length) return;
+  [q[i], q[j]] = [q[j], q[i]]; save(); render();
+}
+function queueTop(id) { const q = state.session.queue; q.splice(q.indexOf(id), 1); q.unshift(id); save(); render(); }
+
+/* ---------- 訪客（於「活動」分頁加入，不會計入會員名單） ---------- */
+function addGuest() {
+  const el = document.getElementById('guestName'), name = (el ? el.value : (ui.guestNameDraft || '')).trim(), s = state.session;
+  if (!name) return;
+  if (atMax()) { showAlert(t('maxAttendReached', s.maxAttend)); return; }
+  const g = { id: uid(), name, gender: ui.gGender, grade: ui.gGrade, mixed: ui.gGender === 'F' ? true : ui.gMixed, wins: 0, losses: 0, guest: true };
+  s.guests.push(g); s.present.push(g.id); s.checkedIn.push(g.id); s.queue.push(g.id); s.wait[g.id] = 0;
+  ui.guestNameDraft = '';
+  touchAttend(); save(); render(); setTimeout(() => { const e = document.getElementById('guestName'); e && e.focus(); }, 0);
+}
+function removeGuest(id) {
+  const s = state.session, g = s.guests.find(x => x.id === id); if (!g) return;
+  if (playing().has(id)) { showAlert(t('guestRemoveBlockedAlert')); return; }
+  showConfirm(t('deleteGuestConfirm', g.name), () => {
+    s.guests = s.guests.filter(x => x.id !== id); s.present = s.present.filter(x => x !== id);
+    s.queue = s.queue.filter(x => x !== id); s.checkedIn = s.checkedIn.filter(x => x !== id); s.left = s.left.filter(x => x !== id); delete s.played[id];
+    save(); render();
+  });
+}
+function promoteGuest(id) {
+  const s = state.session, g = s.guests.find(x => x.id === id); if (!g) return;
+  showConfirm(t('promoteGuestConfirm', g.name), () => {
+    const { guest, ...m } = g;
+    state.members.push(m); s.guests = s.guests.filter(x => x.id !== id);
+    save(); render();
+  });
+}
+
+/* ---------- 會員 ---------- */
+function addMember(name, gender, grade, mixed) {
+  name = (name || '').trim();
+  if (!name) return false;
+  if (gender === 'F') mixed = true; // 女仕自動適合混雙
+  state.members.push({ id: uid(), name, gender, grade, mixed: !!mixed, wins: 0, losses: 0 });
+  return true;
+}
+function doAdd() {
+  const el = document.getElementById('newName'), name = (el ? el.value : (ui.newNameDraft || '')).trim();
+  if (!name) return;
+  const finish = () => {
+    addMember(name, ui.addGender, ui.addGrade, ui.addMixed);
+    ui.newNameDraft = '';
+    save(); render(); setTimeout(() => { const e = document.getElementById('newName'); e && e.focus(); }, 0);
+  };
+  if (state.members.some(m => m.name === name)) showConfirm(t('dupNameConfirm', name), finish);
+  else finish();
+}
+function doBulk() {
+  const txt = document.getElementById('bulkText').value;
+  let n = 0, skipped = 0;
+  txt.split(/\n/).forEach(rawLine => {
+    const line = rawLine.trim();
+    if (!line) return;
+    // 姓名可以有空格（例如 "Chris Kwan"）：如果一行入面有逗號，就用逗號分隔欄位（姓名, 性別, 組別, 混雙），
+    // 姓名本身嘅空格會保留；如果冇逗號，先當係舊格式（純用空格分隔，姓名唔可以有空格）。
+    const parts = (/[,，]/.test(line) ? line.split(/[,，]/) : line.split(/\s+/)).map(s => s.trim()).filter((s, i) => i === 0 || s.length);
+    const name = parts[0];
+    if (!name) return;
+    let g = 'M', gr = 'B', mx = false;
+    parts.slice(1).forEach(x => {
+      if (/^(m|男)$/i.test(x)) g = 'M'; else if (/^(f|女)$/i.test(x)) g = 'F';
+      else if (/^a$/i.test(x)) gr = 'A'; else if (/^b$/i.test(x)) gr = 'B'; else if (/^c$/i.test(x)) gr = 'C';
+      else if (/^(混|混雙|mix|mixed|y|yes)$/i.test(x)) mx = true;
+    });
+    // 名單入面（或者呢次滙入同一批入面）已經有同名會員 → 略過呢一項，唔會新增重複或者覆蓋原有資料
+    if (state.members.some(m => m.name === name)) { skipped++; return; }
+    if (addMember(name, g, gr, mx)) n++;
+  });
+  ui.bulkOpen = false; save(); render(); showAlert(skipped ? t('bulkAddedSkippedAlert', n, skipped) : t('bulkAddedAlert', n));
+}
+function renameMember(id, v) { const m = M(id); v = (v || '').trim(); if (m && v) { m.name = v; save(); } render(); }
+function setGender(id, g) { const m = M(id); if (m) { m.gender = g; if (g === 'F') m.mixed = true; save(); render(); } }
+function setGrade(id, g) { const m = M(id); if (m && m.gender === 'M') { m.grade = g; save(); render(); } }
+function toggleMixed(id) { const m = M(id); if (m && m.gender !== 'F') { m.mixed = !m.mixed; save(); render(); } }
+function setWL(id, f, v) { const m = M(id); if (m) { m[f] = Math.max(0, parseInt(v, 10) || 0); save(); render(); } }
+function removeMember(id) {
+  const m = M(id); if (!m) return;
+  if (playing().has(id)) { showAlert(t('memberRemoveBlockedAlert')); return; }
+  showConfirm(t('deleteMemberConfirm', m.name), () => doRemoveMember(id));
+}
+function doRemoveMember(id) {
+  const m = M(id); if (!m) return;
+  state.members = state.members.filter(x => x.id !== id);
+  const s = state.session;
+  s.present = s.present.filter(x => x !== id); s.queue = s.queue.filter(x => x !== id); s.checkedIn = s.checkedIn.filter(x => x !== id); s.left = s.left.filter(x => x !== id); delete s.played[id];
+  save(); render();
+}
+
+/* ---------- 紀錄 ---------- */
+function flipLog(id) {
+  const l = state.log.find(x => x.id === id); if (!l) return;
+  const oldW = l.teams[l.winner], oldL = l.teams[1 - l.winner];
+  oldW.forEach(pid => { const m = M(pid); if (m) { m.wins = Math.max(0, m.wins - 1); m.losses++; } });
+  oldL.forEach(pid => { const m = M(pid); if (m) { m.losses = Math.max(0, m.losses - 1); m.wins++; } });
+  l.winner = 1 - l.winner; save(); render();
+}
+
+/* ---------- 設定 ---------- */
+function setSetting(k, v) { state.settings[k] = v; save(); render(); }
+function addVenue() {
+  const el = document.getElementById('newVenue'), v = (el.value || '').trim();
+  if (!v || state.settings.venues.includes(v)) return;
+  state.settings.venues.push(v); save(); render();
+}
+function removeVenue(i) { state.settings.venues.splice(i, 1); save(); render(); }
+function defaultVenue(i) { const v = state.settings.venues.splice(i, 1)[0]; state.settings.venues.unshift(v); save(); render(); }
+function archiveActivity() {
+  const s = state.session;
+  const matches = state.log.filter(l => l.night === s.night).reverse();
+  const wl = {};
+  matches.forEach(l => l.teams.forEach((t, ti) => t.forEach(id => { const r = wl[id] = wl[id] || { w: 0, l: 0 }; if (l.winner === ti) r.w++; else r.l++; })));
+  const ids = [...new Set([...s.present, ...s.left])];
+  const newActivityRecord = {
+    id: uid(), date: s.date, venue: s.venue, courts: s.courts.length, maxAttend: s.maxAttend, endedAt: Date.now(),
+    attendees: ids.map(id => { const m = M(id) || { name: '?', gender: '', grade: '', mixed: false }; const r = wl[id] || { w: 0, l: 0 };
+      return { name: m.name, guest: !!m.guest, gender: m.gender, grade: m.grade, mixed: !!m.mixed, games: s.played[id] || 0, wins: r.w, losses: r.l, left: s.left.includes(id) }; }),
+    matches: matches.map(l => ({ time: l.time, court: l.court, names: l.names.map((n, ti) => l.teams[ti].map((id, k) => (M(id) || {}).name || n[k])), winner: l.winner, durationMs: l.durationMs ?? null }))
+  };
+  state.activities.unshift(newActivityRecord);
+  state.activities = state.activities.slice(0, 100);
+  saveNewActivityToDb(newActivityRecord);
+}
+function startFresh() {
+  state.session = freshSession(state.settings.courts, state.settings.venues[0] || '');
+  ui.edit = {}; ui.swap = null; tab = 'attend';
+}
+function newActivity() {
+  const s = state.session, has = s.present.length || tonightCount();
+  if (!has) { startFresh(); save(); render(); return; }
+  endActivity();
+}
+function endActivity() {
+  const s = state.session, has = s.present.length || tonightCount();
+  if (!has) { showAlert(t('noActivityDataAlert')); return; }
+  if (!allCourtsClosed()) {
+    const open = s.courts.map((c, i) => c.status !== 'closed' ? (i + 1) : null).filter(Boolean);
+    showAlert(t('courtsNotClosedAlert', open));
+    return;
+  }
+  const proceed = () => {
+    showConfirm(t('endActivityConfirm'), () => {
+      archiveActivity(); startFresh(); save(); render();
+      exportLastActivity();
+    });
+  };
+  if (state.settings.adminPassword) {
+    showPrompt(t('endActivityPwPrompt'), pw => {
+      if (pw !== state.settings.adminPassword) { showAlert(t('wrongPwEndAlert')); return; }
+      proceed();
+    }, { inputType: 'password' });
+  } else proceed();
+}
+const csvCell = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+const csvRow = a => a.map(csvCell).join(',');
+function download(name, text, mime) {
+  // 喺 Claude Artifact 入面，普通嘅 <a download> 連結／Blob 下載未必有反應（要用 downloads
+  // capability 先真正彈出儲存），所以呢度會兩種都試：有 downloadsApi 就用嗰個，
+  // 同時都做返舊有嘅 Blob 連結方式做後備（真正瀏覽器入面呢個照樣有效）。
+  if (downloadsApi) {
+    downloadsApi.save({ filename: name, data: text }).catch(() => {});
+  }
+  try {
+    const blob = new Blob(['﻿' + text], { type: mime });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) {}
+}
+/* 有部分內嵌瀏覽器（例如 Documents 開啟「封鎖 HTML 檢視器嘅外部連結」設定後）會擋咗
+   Blob／下載連結，令匯出完全無反應。所以匯出時：嘗試自動下載之餘，同時彈出一個
+   可以全選複製內文嘅視窗，確保無論邊種瀏覽器都攞到資料。 */
+function offerExport(name, text, mime) {
+  try { download(name, text, mime); } catch (e) {}
+  ui.exportDoc = { name, text, mime };
+  render();
+}
+function closeExport() { ui.exportDoc = null; render(); }
+function copyExportText() {
+  const ta = document.getElementById('exportText');
+  if (!ta) return;
+  let ok = false;
+  try { ta.focus(); ta.select(); ta.setSelectionRange(0, 999999); ok = document.execCommand('copy'); } catch (e) {}
+  if (ok) { showAlert(t('copiedAlert')); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value)
+      .then(() => showAlert(t('copiedAlert')))
+      .catch(() => showAlert(t('copyFailAlert')));
+  } else showAlert(t('copyFailAlert'));
+}
+// 用系統原生「分享」面板（WhatsApp／Mail／訊息／AirDrop 等）直接傳送報告。
+// 只有喺真正 Safari／支援 Web Share API 嘅瀏覽器先有效（部分內嵌瀏覽器例如 Documents 未必支援）。
+function canShareFiles() {
+  try { return !!(navigator.share && navigator.canShare && window.File); } catch (e) { return false; }
+}
+function shareExportText() {
+  const doc = ui.exportDoc; if (!doc) return;
+  const { name, text, mime } = doc;
+  try {
+    if (canShareFiles()) {
+      const file = new File([text], name, { type: mime || 'text/plain' });
+      if (navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: name }).catch(() => {}); return; }
+    }
+    if (navigator.share) { navigator.share({ title: name, text }).catch(() => {}); return; }
+  } catch (e) {}
+  showAlert(t('shareUnsupportedAlert'));
+}
+function exportModal() {
+  if (!ui.exportDoc) return '';
+  const { name, text } = ui.exportDoc;
+  const shareBtn = (typeof navigator !== 'undefined' && navigator.share) ? `<button class="btn btn-primary" data-call="shareExportText()">${t('shareBtn')}</button>` : '';
+  return `<div class="modal-backdrop dialog-backdrop" data-call="if(event.target===this)closeExport()"><div class="modal dialog" style="max-width:560px">
+    <h4>${esc(t('exportTitle', name))}</h4>
+    <p style="font-size:13px">${esc(t('exportHint', name.split('.').pop()))}</p>
+    <textarea id="exportText" readonly style="width:100%;height:260px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);">${esc(text)}</textarea>
+    <div class="modal-actions"><button class="btn btn-ghost" data-call="closeExport()">${t('closeBtn')}</button><button class="btn btn-ghost" data-call="copyExportText()">${t('copyAllBtn')}</button>${shareBtn}</div>
+  </div></div>`;
+}
+function exportLastActivity() {
+  const a = state.activities[0];
+  if (!a) { showAlert(t('noFinishedActivityAlert')); return; }
+  const fmtT = tm => new Date(tm).toLocaleString(state.settings.lang === 'en' ? 'en-GB' : 'zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+  // 將每場耗時（毫秒）格式化做「分:秒」，方便睇；無記錄（例如舊資料冇呢個欄位）就留空。
+  const fmtDur = ms => {
+    if (ms == null || !(ms > 0)) return '';
+    const totalSec = Math.round(ms / 1000), mm = Math.floor(totalSec / 60), ss = totalSec % 60;
+    return `${mm}:${String(ss).padStart(2, '0')}`;
+  };
+  const rows = [
+    [t('csvClub'), CLUB], [t('csvActivityDate'), a.date], [t('csvVenue'), a.venue], [t('csvCourtCount'), a.courts], [t('csvAttendCount'), a.attendees.length], [], [t('csvAttendList')],
+    [t('csvName'), t('csvRole'), t('csvGender'), t('csvGrade'), t('csvMixedOk'), t('csvGames'), t('csvWins'), t('csvLosses'), t('csvLeft')],
+    ...a.attendees.map(p => [p.name, p.guest ? t('csvGuest') : t('csvMember'), p.gender === 'F' ? t('genderF') : p.gender === 'M' ? t('genderM') : '', p.grade, p.mixed ? t('csvYes') : t('csvNo'), p.games, p.wins, p.losses, p.left ? t('csvYes') : '']),
+    [], [t('csvMatchLog')], [t('csvRound'), t('csvTime'), t('csvCourt'), t('csvTeam1'), t('csvTeam2'), t('csvWinner'), t('csvDuration')],
+    ...a.matches.map((m, i) => [i + 1, fmtT(m.time), t('csvCourtN', m.court), m.names[0].join(' & '), m.names[1].join(' & '), m.names[m.winner].join(' & '), fmtDur(m.durationMs)])
+  ];
+  offerExport(t('activityLogFileName', a.date), rows.map(csvRow).join('\r\n'), 'text/csv;charset=utf-8');
+}
+function exportMembers() {
+  offerExport(t('membersFileName', today()), JSON.stringify({ type: 'members', members: state.members }, null, 1), 'application/json');
+}
+function importMembers(file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const raw = JSON.parse(r.result.replace(/^﻿/, ''));
+      const list = Array.isArray(raw) ? raw : raw.members;
+      if (!Array.isArray(list)) throw 0;
+      showConfirm(t('importConfirm', list.length), () => {
+        state = normalize({ ...state, members: list }); save(); render();
+      });
+    } catch (e) { showAlert(t('badFileAlert')); }
+  };
+  r.readAsText(file);
+}
+// 完整備份：連埋設定、活動紀錄、局數紀錄一齊匯出（唔淨係會員），等瀏覽器儲存萬一被系統清咗
+// 都可以隨時由呢個 JSON 檔還原晒返嚟。匯入時借用返 normalize() 嘅安全檢查同缺省補值邏輯。
+function exportFullBackup() {
+  offerExport(t('fullBackupFileName', today()), JSON.stringify({ type: 'full-backup', exportedAt: Date.now(), members: state.members, settings: state.settings, log: state.log, activities: state.activities }, null, 1), 'application/json');
+}
+function importFullBackup(file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const raw = JSON.parse(r.result.replace(/^﻿/, ''));
+      if (!raw || typeof raw !== 'object' || !Array.isArray(raw.members)) throw 0;
+      const activitiesCount = Array.isArray(raw.activities) ? raw.activities.length : 0;
+      showConfirm(t('importFullConfirm', raw.members.length, activitiesCount), () => {
+        state = normalize(raw); save(); render();
+        if (dbApi && state.activities && state.activities.length) {
+          state.activities.forEach(a => { if (a && a.id) saveNewActivityToDb(a); });
+        }
+      });
+    } catch (e) { showAlert(t('badFileAlert')); }
+  };
+  r.readAsText(file);
+}
+function resetAll() {
+  showConfirm(t('resetConfirm'), () => {
+    const oldActivities = state.activities;
+    state.log = []; state.activities = [];
+    state.session = freshSession(state.settings.courts, state.settings.venues[0] || '');
+    ui.edit = {}; ui.swap = null; save(); render();
+    if (dbApi && oldActivities && oldActivities.length) {
+      oldActivities.forEach(a => { if (a && a.id) { try { dbApi.collection('activities').doc(a.id).delete(); } catch (e) {} } });
+    }
+  });
+}
+
+/* ---------- 畫面 ---------- */
+function chip(id) {
+  const m = M(id); if (!m) return '<span class="pc">?</span>';
+  return `<span class="pc g${m.gender}"><span class="nm">${esc(m.name)}</span>${m.mixed ? `<i class="mx">${t('mixedBadge')}</i>` : ''}${m.guest ? `<i class="mx">${t('guestBadge')}</i>` : ''}<small>${pct(m)}</small></span>`;
+}
+function courtCard(c, i, types) {
+  const type = types[i];
+  // 測試階段：場次欄同時顯示 A 場 / B 場 / 女場 / 混場（背後分組資訊），方便測試。
+  const typeTag = `<span class="tag t${type}">${TYPE_NAME()[type]}</span>`;
+  if (c.status === 'closed') {
+    return `<div class="court idle t${type}">
+      <div class="court-top"><span class="court-label">${t('courtNum', i + 1)}</span><span class="tags">${typeTag}<span class="tag">${t('closedTag')}</span></span></div>
+      <div class="hint" style="padding:8px 0">${t('courtClosedHint')}</div>
+      <div class="court-actions"><span></span><button class="btn btn-ghost btn-sm" data-call="reopenCourt(${i})">${t('reopenCourtBtn')}</button></div>
+    </div>`;
+  }
+  const pt = pickType(i, types);
+  const subTag = SUBLABEL()[pt] ? `<span class="tag">${t('nextRoundLabel', SUBLABEL()[pt])}</span>` : '';
+  if (c.status === 'playing') {
+    const fmtTag = `<span class="tag">${formatLabel(c.teams.flat())}</span>`;
+    const gs = c.teams.flat().filter(id => M(id).gender === 'M').map(id => M(id).grade);
+    const gtype = !gs.length ? '' : gs.every(g => g === 'A') ? t('typeA') : gs.every(g => g === 'B') ? t('typeB') : gs.every(g => g === 'C') ? t('typeC')
+      : (gs.includes('A') ? t('typeAB') : t('typeBC'));
+    const gtypeTag = gtype ? `<span class="tag">${gtype}</span>` : '';
+    const editing = !!ui.edit[i];
+    const team = (tm) => {
+      const streak = (tm === 0 && c.stay > 0) ? `<span class="tag ws">${t('streakTag', c.stay, +state.settings.wsMax || 0)}</span>` : '';
+      if (editing) return `<div class="team">${streak}${c.teams[tm].map(id => `<button class="pc-btn" data-call="openSwap(${i},'${id}')">${chip(id)} ✎</button>`).join('')}</div>`;
+      return `<div class="team">${streak}<div class="team-row-flex">
+        <div class="team-info">${c.teams[tm].map(chip).join('')}</div>
+        <button class="win-icon-btn" title="${t('winTeamTitle')}" data-call="showConfirm('${esc(t('confirmWinMsg'))}',()=>recordResult(${i},${tm}))">🏆</button>
+      </div></div>`;
+    };
+    const closeBtn = c.closing
+      ? `<button class="btn btn-ghost btn-sm" data-call="cancelClosing(${i})">${t('cancelClosingBtn')}</button>`
+      : `<button class="btn btn-ghost btn-sm" data-call="closeCourt(${i})">${t('closeCourtAfterBtn')}</button>`;
+    return `<div class="court t${type}">
+      <div class="court-top"><span class="court-label">${t('courtRoundLabel', i + 1, c.num)}</span>
+        <span class="tags">${typeTag}${fmtTag}${gtypeTag}${c.closing ? `<span class="tag">${t('closingTag')}</span>` : ''}</span></div>
+      ${team(0)}<div class="vs">VS</div>${team(1)}
+      <div class="court-actions">
+        <button class="btn btn-ghost btn-sm" data-call="toggleEdit(${i})">${editing ? t('doneEditBtn') : t('editMatchBtn')}</button>
+        ${closeBtn}
+        <button class="btn btn-ghost btn-sm" data-call="cancelCourt(${i})">${t('cancelMatchBtn')}</button></div>
+      ${editing ? `<div class="next-up">${t('editHint')}</div>` : ''}
+    </div>`;
+  }
+  // idle：可人手指定場地類型、完結此場、或編排（測試階段：選項同時顯示 A/B 分組）
+  const typeSel = `<select class="type-select" onchange="setCourtType(${i},this.value)">
+    <option value="auto" ${!c.manualType ? 'selected' : ''}>${t('autoAssign')}</option>
+    <option value="A" ${c.manualType === 'A' ? 'selected' : ''}>${t('setTypeA')}</option>
+    <option value="B" ${c.manualType === 'B' ? 'selected' : ''}>${t('setTypeB')}</option>
+    <option value="C" ${c.manualType === 'C' ? 'selected' : ''}>${t('setTypeC')}</option>
+    <option value="F" ${c.manualType === 'F' ? 'selected' : ''}>${t('setTypeF')}</option>
+    <option value="G" ${c.manualType === 'G' ? 'selected' : ''}>${t('setTypeG')}</option>
+  </select>`;
+  return `<div class="court idle t${type}">
+    <div class="court-top"><span class="court-label">${t('courtNum', i + 1)}</span><span class="tags">${typeTag}${subTag}<span class="tag">${t('idleTag')}</span></span></div>
+    ${typeSel}
+    <div class="court-actions"><button class="btn btn-ghost btn-sm" data-call="closeCourt(${i})">${t('closeCourtBtn')}</button><button class="btn btn-primary btn-sm" data-call="manualFill(${i})">${t('assignCourtBtn')}</button></div>
+  </div>`;
+}
+function guestCard() {
+  const s = state.session;
+  return `<div class="card">
+    <h3>${t('addGuestTitle')}</h3>
+    <div class="add-row">
+      <input type="text" id="guestName" placeholder="${t('guestNamePlaceholder')}" value="${esc(ui.guestNameDraft || '')}" oninput="ui.guestNameDraft=this.value" onkeydown="if(event.key==='Enter')addGuest()">
+      <select onchange="ui.gGender=this.value;render()"><option value="M" ${ui.gGender === 'M' ? 'selected' : ''}>${t('genderM')}</option><option value="F" ${ui.gGender === 'F' ? 'selected' : ''}>${t('genderF')}</option></select>
+      ${ui.gGender === 'M' ? `<select onchange="ui.gGrade=this.value"><option value="A" ${ui.gGrade === 'A' ? 'selected' : ''}>GRADE A</option><option value="B" ${ui.gGrade === 'B' ? 'selected' : ''}>GRADE B</option><option value="C" ${ui.gGrade === 'C' ? 'selected' : ''}>GRADE C</option></select>` : ''}
+      <label class="chk"><input type="checkbox" ${ui.gGender === 'F' ? 'checked disabled' : (ui.gMixed ? 'checked' : '')} onchange="ui.gMixed=this.checked"> ${t('suitableMixedLabel')}${ui.gGender === 'F' ? ` <small>${t('mixedAutoHint')}</small>` : ''}</label>
+      <button class="btn btn-primary" data-call="addGuest()">${t('addToActivityBtn')}</button>
+    </div>
+    ${s.guests.length ? s.guests.map(m => guestRow(m, true)).join('') : ''}
+  </div>`;
+}
+function viewCourts() {
+  const s = state.session, types = courtTypes();
+  if (!s.started) {
+    return `<div class="hint">${t('notStartedHint')}
+      <button class="btn btn-primary btn-sm" data-call="setTab('attend')">${t('goToAttendBtn')}</button></div>`;
+  }
+  if (!s.present.length) return `<div class="hint">${t('noAttendeesHint')}</div>${guestCard()}`;
+  const q = s.queue.map((id, k) => `<div class="q-row"><span class="q-no">${k + 1}</span>
+      <div class="q-main">${chip(id)}<div class="q-sub">${t('playedWaitLine', s.played[id] || 0, s.wait[id] || 0)}</div></div>
+      <button class="btn btn-sm ci-toggle ci-in" data-call="checkOut('${id}')">${t('checkOutBtn')}</button>
+      <button class="icon-btn" title="${t('queueTopTitle')}" data-call="queueTop('${id}')">⤒</button>
+      <button class="icon-btn" title="${t('moveUpTitle')}" data-call="moveQ('${id}',-1)">↑</button>
+      <button class="icon-btn" title="${t('moveDownTitle')}" data-call="moveQ('${id}',1)">↓</button>
+      <button class="icon-btn" title="${t('leaveActivityTitle')}" data-call="setPresent('${id}',false)">✕</button></div>`).join('');
+  const pm = s.present.map(M).filter(Boolean), fN = pm.filter(m => m.gender === 'F').length, mN = pm.length - fN;
+  const warns = [];
+  if (fN === 1) warns.push(t('onlyOneFemaleWarn'));
+  if (mN === 1) warns.push(t('onlyOneMaleWarn'));
+  const wsMsg = s.ws ? t('wsOnMsg', +state.settings.wsMax || 0) : t('wsOffMsg');
+  // 測試階段：保留場地提示同時顯示 A/B 分組資訊。
+  const reserved = types.map((ty, i) => ty !== 'G' ? t('reservedCourtLabel', i + 1, TYPE_NAME()[ty], !!state.session.courts[i].manualType) : '').filter(Boolean).join(t('listSep'));
+  const allClosed = allCourtsClosed();
+  return `
+      <div class="panel-title"><span>${fmtDate(s.date)} · ${esc(s.venue || t('venueNotSet'))}</span>
+        <span class="btn-row">
+          <button class="btn btn-sm ws-toggle ${s.ws ? 'ws-on' : 'ws-off'}" data-call="toggleWS()">${t('wsToggleBtn')}</button>
+          <button class="btn btn-primary btn-sm" data-call="fillAllIdle()">${t('fillAllBtn')}</button>
+          <button class="btn btn-danger btn-sm" data-call="endActivity()" ${allClosed ? '' : 'disabled'}>${t('endActivityBtn')}</button>
+        </span></div>
+      ${!allClosed ? `<div class="status warn">${t('mustCloseAllWarn')}</div>` : ''}
+      ${warns.map(w => `<div class="status warn">${w}</div>`).join('')}
+      ${reserved ? `<div class="status info">${t('reservedLine', reserved)}</div>` : ''}
+      <div class="status ${s.ws ? 'on' : ''}">${wsMsg}</div>
+      <div class="courts">${s.courts.map((c, i) => courtCard(c, i, types)).join('')}</div>
+      <div class="panel-title"><span>${t('queueTitle', s.queue.length)}</span></div>
+      <div class="card queue-flow">${q || `<div class="hint" style="padding:8px">${t('noOneWaitingHint')}</div>`}</div>
+      ${pendingCheckInCard()}
+      ${guestCard()}`;
+}
+function pendingCheckInCard() {
+  const s = state.session;
+  const pending = s.present.filter(id => !s.checkedIn.includes(id));
+  if (!pending.length) return '';
+  return `<div class="panel-title"><span>${t('pendingCheckInTitle', pending.length)}</span></div>
+    <div class="card queue-flow">${pending.map(id => `<div class="q-row"><div class="q-main">${chip(id)}</div>
+      <button class="btn btn-sm ci-toggle ci-out" data-call="checkIn('${id}')">${t('checkInBtn')}</button></div>`).join('')}</div>`;
+}
+function swapModal() {
+  if (!ui.swap) return '';
+  const { court: ci, pid } = ui.swap, s = state.session, c = s.courts[ci];
+  if (!c || c.status !== 'playing' || !c.teams.flat().includes(pid)) { ui.swap = null; return ''; }
+  const types = courtTypes(), pt = pickType(ci, types), info = buildInfo();
+  const others = c.teams.flat().filter(x => x !== pid);
+  const teamOf = id => c.teams[0].includes(id) ? 1 : 2;
+  const me = M(pid);
+  return `<div class="modal-backdrop" data-call="if(event.target===this)closeSwap()"><div class="modal">
+    <h4>${esc(t('swapTitle', me.name, teamOf(pid)))}</h4>
+    <div class="sub">${t('swapWithinLabel')}</div>
+    ${others.map(id => `<button class="pick" data-call="swapWithin(${ci},'${pid}','${id}')"><span>${chip(id)}</span><span class="q-sub">${t('teamLabel', teamOf(id))}</span></button>`).join('')}
+    <div class="sub">${esc(t('replaceFromQueueLabel', me.name))}</div>
+    ${s.queue.map(id => `<button class="pick" data-call="replaceWith(${ci},'${pid}','${id}')"><span>${chip(id)}</span>
+      <span class="q-sub">${t('replaceCandLine', s.played[id] || 0, s.wait[id] || 0, !eligible(id, pt, info))}</span></button>`).join('') || `<div class="q-sub">${t('queueEmptyLabel')}</div>`}
+    <div class="sub">${t('otherLabel')}</div>
+    <div class="btn-row"><button class="btn btn-danger btn-sm" data-call="showConfirm('${esc(t('leaveConfirmMsg', me.name))}',()=>leaveActivity('${pid}'))">${t('leaveThisPlayerBtn')}</button>
+      <button class="btn btn-ghost btn-sm" data-call="closeSwap()">${t('cancelBtn')}</button></div>
+  </div></div>`;
+}
+
+// Check-in／Check-out 係「活動」分頁先有嘅功能（喺球場輪候名單度做），出席頁淨係負責
+// 揀邊啲人出席，唔再顯示／操作 Check-in 狀態，減少混淆。
+function attendRow(m) {
+  const s = state.session;
+  const on = s.present.includes(m.id), left = s.left.includes(m.id);
+  return `<div class="m-row ${on ? '' : 'off'}">
+    <input type="checkbox" id="pres-${m.id}" ${on ? 'checked' : ''} onchange="setPresent('${m.id}',this.checked)">
+    <label for="pres-${m.id}" class="m-name" style="cursor:pointer">${esc(m.name)} ${left ? `<span class="bridge">${t('leftBadge')}</span>` : ''}</label>
+    <span class="tag" style="color:var(--${m.gender === 'F' ? 'female' : 'male'})">${m.gender === 'F' ? t('genderF') : t('genderM')}</span>
+    ${m.mixed ? `<i class="mx">${t('mixedBadge')}</i>` : ''}
+    <span class="rate">${pct(m)}</span>
+    </div>`;
+}
+function viewAttend() {
+  const s = state.session, types = courtTypes();
+  const cmp = (a, b) => sm(b) - sm(a) || a.name.localeCompare(b.name);
+  const A = state.members.filter(m => m.gender === 'M' && m.grade === 'A').sort(cmp), B = state.members.filter(m => m.gender === 'M' && m.grade === 'B').sort(cmp);
+  const C = state.members.filter(m => m.gender === 'M' && m.grade === 'C').sort(cmp);
+  const W = state.members.filter(m => m.gender === 'F').sort(cmp);
+  const pm = s.present.map(M).filter(Boolean);
+  const cnt = (f) => pm.filter(f).length;
+  const reserved = types.map((ty, i) => ty !== 'G' ? t('reservedCourtLabel', i + 1, TYPE_NAME()[ty], false) : '').filter(Boolean).join(t('listSep'));
+  const mx = +s.maxAttend;
+  const statusMsg = s.attendConfirmed ? (s.started ? t('startedStatusMsg') : t('confirmedStatusMsg'))
+    : (s.started ? t('reconfirmStatusMsg') : t('notConfirmedStatusMsg'));
+  return `
+  <div class="card">
+    <div class="add-row">
+      <label class="field">${t('dateLabel')}<input type="date" value="${esc(s.date)}" onchange="setDate(this.value)"></label>
+      <label class="field">${t('venueLabel')}<select onchange="setVenue(this.value)">
+        ${!state.settings.venues.length ? `<option value="">${t('noVenuesHint')}</option>` : ''}
+        ${state.settings.venues.map(v => `<option value="${esc(v)}" ${v === s.venue ? 'selected' : ''}>${esc(v)}</option>`).join('')}
+        ${(s.venue && !state.settings.venues.includes(s.venue)) ? `<option value="${esc(s.venue)}" selected>${esc(s.venue)}</option>` : ''}
+      </select></label>
+      <label class="field">${t('maxAttendLabel')}<input type="number" min="0" value="${mx}" onchange="setMaxAttend(this.value)"></label>
+    </div>
+    <div class="row" style="margin-top:6px"><span>${t('courtsCountLabel')}</span>
+      <div class="stepper"><button data-call="setCourts(${s.courts.length - 1})">–</button><b>${s.courts.length}</b><button data-call="setCourts(${s.courts.length + 1})">+</button></div></div>
+    <div class="status info" style="margin:6px 0 0">${reserved ? t('reservedLine', reserved) : t('noReservedCourtsHint')}</div>
+  </div>
+  <div class="status ${s.attendConfirmed ? 'on' : (s.started ? 'warn' : '')}">${statusMsg}</div>
+  <div class="btn-row" style="margin-bottom:6px">
+    <button class="btn btn-ghost btn-sm" data-call="nonePresent()">${t('clearPresentBtn')}</button>
+    ${!s.attendConfirmed ? `<button class="btn btn-primary btn-sm" data-call="confirmAttend()">${t('confirmAttendBtn')}</button>` : ''}
+    <span class="note" style="padding:6px 4px;text-align:left">${t('attendCountNote', pm.length, mx, cnt(m => m.gender === 'M'), cnt(m => m.gender === 'F'), cnt(m => m.grade === 'A'), cnt(m => m.grade === 'B'), cnt(m => m.grade === 'C'))}</span>
+  </div>
+  ${!state.members.length ? `<div class="hint">${t('noMembersHint')}</div>` : ''}
+  <div class="sec-title">${t('gradeATitle', A.length)}<button class="btn btn-ghost btn-sm" data-call="allPresentGroup('A')">${t('sectionAllPresentBtn')}</button></div>
+  ${A.map(attendRow).join('') || `<div class="hint">${t('noGradeAMembers')}</div>`}
+  <div class="sec-title">${t('gradeBTitle', B.length)}<button class="btn btn-ghost btn-sm" data-call="allPresentGroup('B')">${t('sectionAllPresentBtn')}</button></div>
+  ${B.map(attendRow).join('') || `<div class="hint">${t('noGradeBMembers')}</div>`}
+  <div class="sec-title">${t('gradeCTitle', C.length)}<button class="btn btn-ghost btn-sm" data-call="allPresentGroup('C')">${t('sectionAllPresentBtn')}</button></div>
+  ${C.map(attendRow).join('') || `<div class="hint">${t('noGradeCMembers')}</div>`}
+  <div class="sec-title">${t('womenGroupTitle', W.length)}<button class="btn btn-ghost btn-sm" data-call="allPresentGroup('F')">${t('sectionAllPresentBtn')}</button></div>
+  ${W.map(attendRow).join('') || `<div class="hint">${t('noWomenMembers')}</div>`}
+  ${s.guests.length ? `<div class="sec-title">${t('guestsSectionTitle')}</div>${s.guests.map(m => guestRow(m, false)).join('')}` : ''}`;
+}
+// Check-in／Check-out 淨係活動分頁先有嘅功能（showCheckIn=false 用喺出席頁，唔顯示 Check-in 掣／狀態）。
+function guestRow(m, showCheckIn) {
+  const s = state.session;
+  const on = s.present.includes(m.id), ci = s.checkedIn.includes(m.id);
+  return `<div class="m-row ${on ? '' : 'off'}">
+    <input type="checkbox" ${on ? 'checked' : ''} onchange="setPresent('${m.id}',this.checked)">
+    <span class="m-name">${esc(m.name)} <i class="mx">${t('guestLabelFull')}</i></span>
+    <span class="seg"><button class="${m.gender === 'M' ? 'aM' : ''}" data-call="setGender('${m.id}','M')">${t('genderM')}</button><button class="${m.gender === 'F' ? 'aF' : ''}" data-call="setGender('${m.id}','F')">${t('genderF')}</button></span>
+    ${m.gender === 'M' ? `<span class="seg"><button class="${m.grade === 'A' ? 'aA' : ''}" data-call="setGrade('${m.id}','A')">A</button><button class="${m.grade === 'B' ? 'aB' : ''}" data-call="setGrade('${m.id}','B')">B</button><button class="${m.grade === 'C' ? 'aC' : ''}" data-call="setGrade('${m.id}','C')">C</button></span>` : ''}
+    ${m.gender === 'F'
+      ? `<span class="seg"><button class="aX" style="min-width:56px" disabled title="${t('mixedAutoTitle')}">${t('mixedBtnLabel', true)}</button></span>`
+      : `<span class="seg"><button class="${m.mixed ? 'aX' : ''}" style="min-width:56px" data-call="toggleMixed('${m.id}')">${t('mixedBtnLabel', m.mixed)}</button></span>`}
+    <span class="rate">${pct(m)}</span>
+    ${(showCheckIn !== false && on) ? `<button class="btn btn-sm ${ci ? 'btn-primary' : 'btn-ghost'}" data-call="toggleCheckIn('${m.id}',${!ci})">${ci ? t('checkedInBtn') : t('checkInBtn')}</button>` : ''}
+    <button class="btn btn-ghost btn-sm" data-call="promoteGuest('${m.id}')">${t('addToMembersBtn')}</button>
+    <button class="x-btn" data-call="removeGuest('${m.id}')" title="${t('deleteGuestTitle')}">✕</button>
+  </div>`;
+}
+function memberRow(m, info) {
+  return `<div class="m-row">
+    <span class="m-name" style="display:flex;align-items:center;gap:6px"><input type="text" class="m-name-input" value="${esc(m.name)}" title="${t('editNameTitle')}" onchange="renameMember('${m.id}',this.value)"></span>
+    <span class="seg">
+      <button class="${m.gender === 'M' ? 'aM' : ''}" data-call="setGender('${m.id}','M')">${t('genderM')}</button>
+      <button class="${m.gender === 'F' ? 'aF' : ''}" data-call="setGender('${m.id}','F')">${t('genderF')}</button></span>
+    ${m.gender === 'M' ? `<span class="seg">
+      <button class="${m.grade === 'A' ? 'aA' : ''}" data-call="setGrade('${m.id}','A')">A</button>
+      <button class="${m.grade === 'B' ? 'aB' : ''}" data-call="setGrade('${m.id}','B')">B</button>
+      <button class="${m.grade === 'C' ? 'aC' : ''}" data-call="setGrade('${m.id}','C')">C</button></span>` : ''}
+    ${m.gender === 'F'
+      ? `<span class="seg"><button class="aX" style="min-width:56px" disabled title="${t('mixedAutoTitle')}">${t('mixedBtnLabel', true)}</button></span>`
+      : `<span class="seg"><button class="${m.mixed ? 'aX' : ''}" style="min-width:56px" data-call="toggleMixed('${m.id}')" title="${t('mixedSuitTitle')}">${t('mixedBtnLabel', m.mixed)}</button></span>`}
+    <span class="wl">${t('winsLabel')}<input type="number" min="0" value="${m.wins}" onchange="setWL('${m.id}','wins',this.value)">
+      ${t('lossesLabel')}<input type="number" min="0" value="${m.losses}" onchange="setWL('${m.id}','losses',this.value)"></span>
+    <span class="rate">${pct(m)}</span>
+    <button class="x-btn" data-call="removeMember('${m.id}')" title="${t('deleteTitle')}">✕</button>
+  </div>`;
+}
+// 陞降建議：睇每位會員最近 N 場（state.log，按時間新到舊）嘅勝率，同設定的門檻比較。
+function computeSuggestions() {
+  const st = state.settings;
+  const minGames = Math.max(1, +st.promoteMinGames || 20);
+  const promoteTh = Math.max(0, Math.min(1, (+st.promoteWinRate || 65) / 100));
+  const relegateTh = Math.max(0, Math.min(1, (+st.relegateWinRate || 35) / 100));
+  const out = [];
+  state.members.forEach(m => {
+    if (m.gender !== 'M') return;
+    const recent = state.log.filter(l => l.teams.flat().includes(m.id)).sort((a, b) => b.time - a.time).slice(0, minGames);
+    if (recent.length < minGames) return;
+    let wins = 0;
+    recent.forEach(l => { const ti = l.teams.findIndex(tm => tm.includes(m.id)); if (ti === l.winner) wins++; });
+    const rate = wins / recent.length;
+    // A<->B 用原本設定嘅陞／降門檻；C<->B 對稱處理（B 太勁就陞上 A，B 太弱就降落 C；C 太勁就陞上 B）——
+    // 呢個係喺三級制底下邏輯上必要嘅延伸，原本使用者要求只提到 A/B，未有明確講 C，屬於合理假設。
+    let action = null;
+    if (m.grade === 'B') {
+      if (rate >= promoteTh) action = 'A';
+      else if (rate <= relegateTh) action = 'C';
+    } else if (m.grade === 'A' && rate <= relegateTh) action = 'B';
+    else if (m.grade === 'C' && rate >= promoteTh) action = 'B';
+    if (action) out.push({ member: m, rate, games: recent.length, action });
+  });
+  return out.sort((a, b) => b.rate - a.rate);
+}
+function suggestionsCard() {
+  const sug = computeSuggestions();
+  return `<div class="card">
+    <div class="panel-title">${t('suggestSectionTitle')}</div>
+    ${sug.length ? sug.map(s => `<div class="row"><span>${esc(s.member.name)} <i class="gr ${s.member.grade}">${s.member.grade}</i>
+        <small>${t('suggestWinRateLine', s.games, Math.round(s.rate * 100))} · ${t('suggestChangeLine', s.action)}</small></span>
+      <button class="btn btn-primary btn-sm" data-call="setGrade('${s.member.id}','${s.action}')">${t('suggestApplyBtn')}</button></div>`).join('')
+      : `<div class="q-sub" style="padding:4px 0">${t('suggestNoneHint', +state.settings.promoteMinGames || 20)}</div>`}
+  </div>`;
+}
+function viewMembers() {
+  const info = buildInfo();
+  const cmpRecord = (a, b) => sm(b) - sm(a) || games(b) - games(a) || a.name.localeCompare(b.name);
+  const cmpName = (a, b) => a.name.localeCompare(b.name);
+  const cmp = ui.memberSort === 'winrate' ? cmpRecord : cmpName;
+  const A = state.members.filter(m => m.gender === 'M' && m.grade === 'A').sort(cmp);
+  const B = state.members.filter(m => m.gender === 'M' && m.grade === 'B').sort(cmp);
+  const C = state.members.filter(m => m.gender === 'M' && m.grade === 'C').sort(cmp);
+  const W = state.members.filter(m => m.gender === 'F').sort(cmp);
+  return `
+  ${suggestionsCard()}
+  <div class="btn-row" style="margin-bottom:10px">
+    <span class="q-sub">${t('memberSortLabel')}</span>
+    <button class="btn btn-sm ${ui.memberSort !== 'winrate' ? 'btn-primary' : 'btn-ghost'}" data-call="ui.memberSort='name';render()">${t('memberSortByName')}</button>
+    <button class="btn btn-sm ${ui.memberSort === 'winrate' ? 'btn-primary' : 'btn-ghost'}" data-call="ui.memberSort='winrate';render()">${t('memberSortByRecord')}</button>
+  </div>
+  <div class="card">
+    <div class="add-row">
+      <input type="text" id="newName" placeholder="${t('playerNamePlaceholder')}" value="${esc(ui.newNameDraft || '')}" oninput="ui.newNameDraft=this.value" onkeydown="if(event.key==='Enter')doAdd()">
+      <select onchange="ui.addGender=this.value;render()"><option value="M" ${ui.addGender === 'M' ? 'selected' : ''}>${t('genderM')}</option><option value="F" ${ui.addGender === 'F' ? 'selected' : ''}>${t('genderF')}</option></select>
+      ${ui.addGender === 'M' ? `<select onchange="ui.addGrade=this.value"><option value="A" ${ui.addGrade === 'A' ? 'selected' : ''}>GRADE A</option><option value="B" ${ui.addGrade === 'B' ? 'selected' : ''}>GRADE B</option><option value="C" ${ui.addGrade === 'C' ? 'selected' : ''}>GRADE C</option></select>` : ''}
+      <label class="chk"><input type="checkbox" ${ui.addGender === 'F' ? 'checked disabled' : (ui.addMixed ? 'checked' : '')} onchange="ui.addMixed=this.checked"> ${t('suitableMixedLabel')}${ui.addGender === 'F' ? ` <small>${t('mixedAutoHint')}</small>` : ''}</label>
+      <button class="btn btn-primary" data-call="doAdd()">${t('addBtn')}</button>
+    </div>
+    <div class="add-row" style="margin-top:10px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" data-call="ui.bulkOpen=!ui.bulkOpen;render()">${t('bulkToggleBtn', ui.bulkOpen)}</button>
+    </div>
+    ${ui.bulkOpen ? `<div style="margin-top:10px">
+      <textarea id="bulkText" rows="6" style="width:100%" placeholder="${t('bulkPlaceholder')}"></textarea>
+      <div style="margin-top:8px"><button class="btn btn-primary btn-sm" data-call="doBulk()">${t('addBulkBtn')}</button></div></div>` : ''}
+  </div>
+  <div class="note" style="text-align:left;padding:6px 4px">${t('membersNote')}</div>
+  <div class="sec-title">${t('gradeATitle', A.length)}</div>
+  ${A.map(m => memberRow(m, info)).join('') || `<div class="hint">${t('noGradeAMembers')}</div>`}
+  <div class="sec-title">${t('gradeBTitle', B.length)}</div>
+  ${B.map(m => memberRow(m, info)).join('') || `<div class="hint">${t('noGradeBMembers')}</div>`}
+  <div class="sec-title">${t('gradeCTitle', C.length)}</div>
+  ${C.map(m => memberRow(m, info)).join('') || `<div class="hint">${t('noGradeCMembers')}</div>`}
+  <div class="sec-title">${t('womenGroupTitle', W.length)}</div>
+  ${W.map(m => memberRow(m, info)).join('') || `<div class="hint">${t('noWomenMembers')}</div>`}`;
+}
+// 個人戰績走勢：以 Unicode 方塊字元做簡單走勢圖，避免引入圖表庫。
+const SPARK_CHARS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+function buildSparkline(matchesDesc, id) {
+  if (!matchesDesc.length) return '';
+  const asc = matchesDesc.slice().reverse();
+  const bucketCount = Math.min(12, asc.length);
+  const size = Math.ceil(asc.length / bucketCount);
+  let out = '';
+  for (let i = 0; i < asc.length; i += size) {
+    const bucket = asc.slice(i, i + size);
+    let w = 0;
+    bucket.forEach(l => { const ti = l.teams.findIndex(tm => tm.includes(id)); if (ti === l.winner) w++; });
+    const rate = bucket.length ? w / bucket.length : 0;
+    out += SPARK_CHARS[Math.min(SPARK_CHARS.length - 1, Math.floor(rate * SPARK_CHARS.length))];
+  }
+  return out;
+}
+function trendCard() {
+  const members = state.members.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const mid = ui.trendMember;
+  const m = mid ? M(mid) : null;
+  let body = `<div class="q-sub" style="padding:6px 0">${t('trendPickHint')}</div>`;
+  if (m) {
+    const matches = state.log.filter(l => l.teams.flat().includes(m.id)).sort((a, b) => b.time - a.time);
+    const total = matches.length;
+    const winRateOf = list => { if (!list.length) return null; let w = 0; list.forEach(l => { const ti = l.teams.findIndex(tm => tm.includes(m.id)); if (ti === l.winner) w++; }); return Math.round(w / list.length * 100); };
+    const rateAll = winRateOf(matches), r10 = winRateOf(matches.slice(0, 10)), r30 = winRateOf(matches.slice(0, 30));
+    const wins = rateAll === null ? 0 : Math.round(rateAll / 100 * total);
+    body = `<div class="row"><span>${t('trendTotalLabel')}</span><b>${total}</b></div>
+      <div class="row"><span>${t('trendWinsLossesLabel')}</span><b>${wins} / ${total - wins}</b></div>
+      <div class="row"><span>${t('trendWinRateLabel')}</span><b>${rateAll === null ? '—' : rateAll + '%'}</b></div>
+      <div class="row"><span>${t('trendLast10Label')}</span><b>${r10 === null ? '—' : r10 + '%'}</b></div>
+      <div class="row"><span>${t('trendLast30Label')}</span><b>${r30 === null ? '—' : r30 + '%'}</b></div>
+      <div class="row"><span>${t('trendSparkLabel')}</span><b style="font-size:18px;letter-spacing:1px">${total ? buildSparkline(matches, m.id) : '—'}</b></div>`;
+  }
+  return `<div class="card">
+    <div class="panel-title">${t('trendCardTitle')}</div>
+    <select onchange="ui.trendMember=this.value;render()">
+      <option value="">${t('trendPickPlaceholder')}</option>
+      ${members.map(mm => `<option value="${mm.id}" ${mid === mm.id ? 'selected' : ''}>${esc(mm.name)}</option>`).join('')}
+    </select>
+    ${body}
+  </div>`;
+}
+// 球季 / 月度總結：以活動及比賽紀錄嘅日期分月統計。
+function summaryMonths() {
+  const set = new Set();
+  state.activities.forEach(a => { if (a.date) set.add(a.date.slice(0, 7)); });
+  state.log.forEach(l => { if (l.date) set.add(l.date.slice(0, 7)); });
+  return [...set].sort().reverse();
+}
+function summaryCard() {
+  const months = summaryMonths();
+  if (!months.length) return `<div class="card"><div class="panel-title">${t('summaryCardTitle')}</div><div class="q-sub" style="padding:6px 0">${t('summaryNoDataHint')}</div></div>`;
+  const ym = months.includes(ui.summaryMonth) ? ui.summaryMonth : months[0];
+  const acts = state.activities.filter(a => a.date && a.date.slice(0, 7) === ym);
+  const logs = state.log.filter(l => l.date && l.date.slice(0, 7) === ym);
+  const totalMatches = logs.length || acts.reduce((sum, a) => sum + a.matches.length, 0);
+  const totalAttendance = acts.reduce((sum, a) => sum + a.attendees.length, 0);
+  const stats = {};
+  logs.forEach(l => l.teams.forEach((team, ti) => team.forEach(id => {
+    const r = stats[id] = stats[id] || { games: 0, wins: 0 };
+    r.games++; if (ti === l.winner) r.wins++;
+  })));
+  const rows = Object.keys(stats).map(id => { const r = stats[id]; return { name: (M(id) || {}).name || '?', games: r.games, rate: r.games ? Math.round(r.wins / r.games * 100) : 0 }; });
+  const topGames = rows.slice().sort((a, b) => b.games - a.games).slice(0, 5);
+  const topRate = rows.filter(r => r.games >= 3).sort((a, b) => b.rate - a.rate).slice(0, 5);
+  const rowHtml = (label, val) => `<div class="row"><span>${esc(label)}</span><b>${val}</b></div>`;
+  return `<div class="card">
+    <div class="panel-title">${t('summaryCardTitle')}</div>
+    <select onchange="ui.summaryMonth=this.value;render()">${months.map(mo => `<option value="${mo}" ${mo === ym ? 'selected' : ''}>${esc(mo)}</option>`).join('')}</select>
+    <div class="row"><span>${t('summaryActivitiesLabel')}</span><b>${acts.length}</b></div>
+    <div class="row"><span>${t('summaryAttendanceLabel')}</span><b>${totalAttendance}</b></div>
+    <div class="row"><span>${t('summaryMatchesLabel')}</span><b>${totalMatches}</b></div>
+    <div class="sec-title" style="margin:12px 0 4px">${t('summaryTopGamesTitle')}</div>
+    ${topGames.length ? topGames.map(r => rowHtml(r.name, r.games)).join('') : `<div class="q-sub">${t('summaryNoneHint')}</div>`}
+    <div class="sec-title" style="margin:12px 0 4px">${t('summaryTopRateTitle')}</div>
+    ${topRate.length ? topRate.map(r => rowHtml(r.name, r.rate + '%')).join('') : `<div class="q-sub">${t('summaryNoneHint')}</div>`}
+  </div>`;
+}
+function viewLog() {
+  const extra = trendCard() + summaryCard();
+  if (!state.log.length) return extra + `<div class="hint">${t('noMatchLogHint')}</div>`;
+  const fmtTime = tm => new Date(tm).toLocaleTimeString(state.settings.lang === 'en' ? 'en-GB' : 'zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+  let lastNight = null, html = `<div class="note">${t('logCorrectionNote')}</div>`;
+  state.log.forEach(l => {
+    if (l.night !== lastNight) {
+      lastNight = l.night;
+      html += `<div class="log-head">${esc(t('logHeadLabel', l.night === state.session.night, fmtDate(l.date) || '', l.venue || ''))}</div>`;
+    }
+    const teamHtml = i => `<div class="log-team ${l.winner === i ? 'w' : 'l'}">${l.teams[i].map((id, k) => esc((M(id) || {}).name || l.names[i][k])).join(' & ')}</div>`;
+    html += `<div class="log-row"><div class="log-meta"><span>${t('logTimeCourtLabel', fmtTime(l.time), l.court)}</span>
+      <button class="btn btn-ghost btn-sm" data-call="flipLog('${l.id}')">${t('correctResultBtn')}</button></div>${teamHtml(0)}${teamHtml(1)}</div>`;
+  });
+  return extra + html;
+}
+function viewSettings() {
+  const st = state.settings, last = state.activities[0];
+  const step = (k, min, max, v) => `<div class="stepper"><button data-call="setSetting('${k}',${Math.max(min, v - 1)})">–</button><b>${v}</b><button data-call="setSetting('${k}',${Math.min(max, v + 1)})">+</button></div>`;
+  const cap = capacityEstimate();
+  return `
+  <div class="card">
+    <h3>${t('courtsTitle')}</h3>
+    <div class="row"><span>${t('defaultCourtsLabel')}<small>${t('defaultCourtsSub')}</small></span>${step('courts', 1, 20, +st.courts)}</div>
+  </div>
+  <div class="card">
+    <h3>${t('capacityRefTitle')}</h3>
+    <div class="status info">${cap.learned
+      ? t('capacityLearnedMsg', cap.matchMinutes.toFixed(1), Math.round(cap.totalSlots), cap.suggested)
+      : t('capacityNotLearnedMsg', state.session.courts.length, cap.suggested)}</div>
+    <div class="row"><span>${t('capacityRefPracticeLabel')}<small>${t('capacityRefPracticeSub')}</small></span></div>
+  </div>
+  <div class="card">
+    <h3>Winner Stay</h3>
+    <div class="row"><span>${t('wsMaxLabel')}<small>${t('wsMaxSub')}</small></span>${step('wsMax', 0, 10, +st.wsMax)}</div>
+  </div>
+  <div class="card">
+    <h3>${t('forceWomenTitle')}</h3>
+    <div class="row"><span>${t('forceWomenLabel')}<small>${t('forceWomenSub')}</small></span>${step('forceWomenEveryN', 0, 20, +st.forceWomenEveryN)}</div>
+  </div>
+  <div class="card">
+    <h3>${t('promoteSettingsTitle')}</h3>
+    <div class="row"><span>${t('promoteMinGamesLabel')}<small>${t('promoteMinGamesSub')}</small></span>${step('promoteMinGames', 1, 100, +st.promoteMinGames)}</div>
+    <div class="row"><span>${t('promoteWinRateLabel')}<small>${t('promoteWinRateSub')}</small></span>${step('promoteWinRate', 1, 100, +st.promoteWinRate)}</div>
+    <div class="row"><span>${t('relegateWinRateLabel')}<small>${t('relegateWinRateSub')}</small></span>${step('relegateWinRate', 0, 100, +st.relegateWinRate)}</div>
+  </div>
+  <div class="card">
+    <h3>${t('adminPwTitle')}</h3>
+    <div class="status info">${t('adminPwFixedNotice')}</div>
+  </div>
+  <div class="card">
+    <h3>${t('defaultVenuesTitle')}</h3>
+    ${st.venues.map((v, i) => `<div class="row"><span>${esc(v)} ${i === 0 ? `<span class="bridge">${t('defaultBadgeLabel')}</span>` : ''}</span>
+      <span class="btn-row">${i > 0 ? `<button class="btn btn-ghost btn-sm" data-call="defaultVenue(${i})">${t('setDefaultBtn')}</button>` : ''}<button class="x-btn" data-call="removeVenue(${i})">✕</button></span></div>`).join('') || `<div class="q-sub" style="padding:4px 0 8px">${t('noDefaultVenuesHint')}</div>`}
+    <div class="add-row"><input type="text" id="newVenue" placeholder="${t('newVenuePlaceholder')}" onkeydown="if(event.key==='Enter')addVenue()"><button class="btn btn-primary btn-sm" data-call="addVenue()">${t('joinBtn')}</button></div>
+  </div>
+  <div class="card">
+    <h3>${t('activityTitle')}</h3>
+    <div class="row"><span>${t('newActivityLabel')}<small>${t('newActivitySub')}</small></span><button class="btn btn-primary btn-sm" data-call="newActivity()">${t('newActivityBtn')}</button></div>
+    <div class="row"><span>${t('exportLastLabel')}<small>${last ? t('exportLastSub', fmtDate(last.date), esc(last.venue || t('venueNotSet')), last.matches.length) : t('noFinishedActivityAlert')}</small></span>
+      <button class="btn btn-ghost btn-sm" data-call="exportLastActivity()" ${last ? '' : 'disabled'}>${t('exportBtn')}</button></div>
+  </div>
+  <div class="card">
+    <h3>${t('membersOfflineTitle')}</h3>
+    <div class="row"><span>${t('fullBackupLabel')}<small>${t('fullBackupSub')}</small></span>
+      <span class="btn-row"><button class="btn btn-primary btn-sm" data-call="exportFullBackup()">${t('exportBtn')}</button>
+      <button class="btn btn-ghost btn-sm" data-call="document.getElementById('impFull').click()">${t('importBtn')}</button></span></div>
+    <input type="file" id="impFull" accept="application/json,.json" style="display:none" onchange="importFullBackup(this.files[0]);this.value=''">
+    <div class="row"><span>${t('importExportMembersLabel')}<small>${t('importExportMembersSub')}</small></span>
+      <span class="btn-row"><button class="btn btn-ghost btn-sm" data-call="exportMembers()">${t('exportBtn')}</button>
+      <button class="btn btn-ghost btn-sm" data-call="document.getElementById('imp').click()">${t('importBtn')}</button></span></div>
+    <input type="file" id="imp" accept="application/json,.json" style="display:none" onchange="importMembers(this.files[0]);this.value=''">
+    <div class="row"><span>${t('clearAllLabel')}<small>${t('clearAllSub')}</small></span><button class="btn btn-danger btn-sm" data-call="resetAll()">${t('clearBtn')}</button></div>
+  </div>
+  <div class="card">
+    <h3>${t('ipadFolderTitle')}</h3>
+    <div class="note" style="text-align:left;padding:0">
+      ${t('ipadFolderNote')}
+    </div>
+  </div>
+  <div class="card note" style="text-align:left">
+    <b>${t('rulesTitle')}</b><br>
+    ${t('rulesNote')}
+  </div>`;
+}
+// 管理員模式：單一開關（ui.adminMode，唔會儲存落資料，每次重新載入都會重置返「未開啟」）。
+// 未開啟時，導覽只可以留喺「活動」（球場編排）呢一頁；開啟需要輸入 state.settings.adminPassword，
+// 一經輸入正確就解鎖晒所有分頁，直至再撳一下掣鎖返（鎖返唔使密碼）。
+function toggleAdminMode() {
+  if (ui.adminMode) { ui.adminMode = false; if (tab !== 'courts') { tab = 'courts'; ui.edit = {}; } render(); return; }
+  showPrompt(t('adminModePwPrompt'), pw => {
+    if (pw !== state.settings.adminPassword) { showAlert(t('wrongPwAlert')); return; }
+    ui.adminMode = true; render();
+  }, { inputType: 'password' });
+}
+// render() 之前如果中途擲出錯誤（例如某個特殊資料組合觸發到未覆蓋到嘅 bug），會令成個畫面
+// 停留喺撳掣之前嘅舊樣——因為 app.innerHTML 嗰行冇行到就已經中斷，睇落好似「撳咗冇反應」，
+// 但其實個動作（例如 Check-in）本身已經改咗資料，淨係重畫呢一步失敗；要撳第二粒掣（觸發第二次
+// render()，如果冇再撞到嗰個錯誤）先會顯示返啱嘅畫面。而家用呢個安全包裝：一旦出錯，唔會再
+// 靜靜哋咩都唔做，會將錯誤訊息直接顯示喺畫面度，等使用者可以影低／複製低傳畀開發者查。
+function render() {
+  try {
+    renderUnsafe();
+  } catch (e) {
+    try { console.error('[HKSBC] render() failed:', e); } catch (e2) {}
+    renderErrorFallback(e);
+  }
+}
+function renderErrorFallback(e) {
+  const app = document.getElementById('app');
+  const msg = (e && (e.stack || e.message)) ? String(e.stack || e.message) : String(e);
+  try {
+    app.innerHTML = `<div style="padding:24px 18px;font:14px -apple-system,BlinkMacSystemFont,sans-serif;color:#7a2a22;background:#fff3f0;min-height:100vh;box-sizing:border-box">
+      <h2 style="margin:0 0 10px;color:#a33;font-size:18px">⚠️ 畫面更新失敗</h2>
+      <p style="line-height:1.6;margin:0 0 12px">呢一步操作可能已經完成（資料已改咗），但係畫面重畫嗰陣出咗錯，所以未即時顯示出嚟。<br>
+      麻煩你影低或者複製低下面呢段文字傳畀開發者，等佢可以搵到問題所在；然後撳「重試」，或者重新載入呢頁。</p>
+      <textarea readonly style="width:100%;height:180px;font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:8px;border:1px solid #d99;border-radius:8px;background:#fff;box-sizing:border-box" data-call="this.select()">${esc(msg)}</textarea>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <button data-call="render()" style="padding:10px 18px;border-radius:10px;border:none;background:#a33;color:#fff;font-weight:700;font-size:14px">重試</button>
+      </div>
+    </div>`;
+  } catch (e2) { /* 連 fallback 都失敗：已經冇更多安全嘅做法，唯有留返舊畫面 */ }
+}
+function renderUnsafe() {
+  const app = document.getElementById('app');
+  if (booting) {
+    app.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:80vh;color:#888;font-size:15px">載入資料中… / Loading…</div>`;
+    return;
+  }
+  if (!splashDone) { app.innerHTML = splashView(); return; }
+  document.documentElement.lang = state.settings.lang === 'en' ? 'en' : 'zh-HK';
+  if (!ui.adminMode && tab !== 'courts') { tab = 'courts'; ui.edit = {}; }
+  // 管理員 MODE 開啟時，整個畫面底色轉做深淺藍色系，並喺頁首顯示明顯字樣，等使用者一望就知。
+  try { document.body.classList.toggle('admin-on', !!ui.adminMode); } catch (e) {}
+  const scroller = document.scrollingElement || document.documentElement;
+  const scrollY = window.scrollY || scroller.scrollTop || 0;
+  const views = { courts: viewCourts, attend: viewAttend, members: viewMembers, log: viewLog, settings: viewSettings };
+  const allTabs = [['courts', t('tabCourts')], ['attend', t('tabAttend')], ['members', t('tabMembers')], ['log', t('tabLog')], ['settings', t('tabSettings')]];
+  const tabs = ui.adminMode ? allTabs : allTabs.filter(([k]) => k === 'courts');
+  app.innerHTML = `
+    <div class="header">
+      ${ui.adminMode ? `<div class="admin-banner">${esc(t('adminModeBanner'))}</div>` : ''}
+      <div class="title-row"><div class="brand"><img src="${LOGO}" alt="HKSBC"><div class="brand-text"><span class="title">${esc(t('appTitle'))}</span><span class="brand-name">Hong Konger in Sutton Badminton Club</span></div></div>
+        <span class="btn-row"><button class="badge-top" style="border:none;cursor:pointer" data-call="toggleAdminMode()" title="${esc(ui.adminMode ? t('adminModeOnBtn') : t('adminModeOffBtn'))}">${esc(ui.adminMode ? t('adminModeOnBtn') : t('adminModeOffBtn'))}</button><button class="badge-top" style="border:none;cursor:pointer" data-call="toggleLang()" title="${esc(t('langToggle'))}">${esc(t('langToggle'))}</button><span class="badge-top">${esc(t('tonightBadge', tonightCount()))}</span></span></div>
+      <div class="tabs">${tabs.map(([k, n]) => `<button class="tab ${tab === k ? 'active' : ''}" data-call="setTab('${k}')">${esc(n)}</button>`).join('')}</div>
+    </div>
+    <div class="view">${views[tab]()}</div>
+    <p class="note"><img class="foot-logo" src="${LOGO}" alt="HKSBC">${CLUB}<br>${t('offlineFooterNote')}</p>${swapModal()}${exportModal()}${dialogModal()}`;
+  // 強制瀏覽器即刻完成一次同步 layout（讀取 offsetHeight 會逼瀏覽器行一次 reflow），
+  // 懷疑係之前「撳咗掣但畫面唔郁」嘅真正成因：喺某啲內嵌／PWA 瀏覽器引擎入面，喺一個
+  // click handler（甚至係佢入面嘅 setTimeout）內部連續、快速咁改 innerHTML＋郁 scrollTop，
+  // compositor 有機會將呢兩個改動「夾埋一齊」處理、甚至延遲到下一個完全無關嘅事件先真正
+  // 畫出嚟畫面（睇落就好似「撳咗冇反應」，其實 DOM／狀態已經改咗，淨係未畫出嚟）。而家
+  // 讀一次 offsetHeight 逼佢即刻 reflow，再用 requestAnimationFrame 等瀏覽器真正畫完
+  // 呢一幀之後，先至去郁 scrollTop，等個「畫面更新」同「捲動位置還原」清楚分開兩個步驟，
+  // 唔會撞埋一齊處理。
+  void app.offsetHeight;
+  // 保持捲動位置：整個 #app 的 innerHTML 每次都會重新產生，瀏覽器（尤其 iPad Safari）
+  // 有時會因而把畫面捲返上頂，造成每次按掣個畫面「上下彈」。重新產生內容後
+  // 還原返之前嘅捲動位置，畫面先唔會郁。
+  if (scrollY) {
+    requestAnimationFrame(function () {
+      window.scrollTo(0, scrollY); scroller.scrollTop = scrollY;
+    });
+  }
+}
+function setTab(nt) {
+  if (nt !== 'courts' && !ui.adminMode) return;   // 未開啟管理員模式：只可以留喺「活動」頁
+  tab = nt; ui.edit = {}; render();
+}
+render();
+initPersistence();
+// ---- 統一事件分派 ----
+// 之前每粒掣都用返原生 onclick="funcName(...)" 屬性，各自負責喺自己最尾 call save()／render()；
+// 出過幾次「撳咗但畫面冇反映」嘅報告，一路都懷疑同呢種「各自為政」嘅寫法有關（例如漏咗
+// call render()、或者中途擲錯就冇行到嗰句 render()）。而家改用單一嘅集中式事件代理：
+// 畫面產生嘅時候，掣上面唔再寫 onclick，而係寫 data-call="funcName(...)"（純粹屬性名唔同，
+// 入面嘅內容完全冇變），交由呢度一個掛喺 document 嘅 click 監聽器統一處理，好處係：
+// (a) 唔理個別動作本身有冇 call render()，呢度執行完之後都保證補做一次；
+// (b) 動作本身如果中途擲錯，會即刻截住並顯示錯誤畫面，唔會再靜靜哋「冇反應」；
+// (c) 所有互動都經過同一條路徑，行為一致、易於追查，唔再靠散落喺唔同函數入面嘅安全網。
+document.addEventListener('click', function (e) {
+  let el = e.target;
+  while (el && el !== document && !(el.getAttribute && el.getAttribute('data-call'))) el = el.parentElement;
+  if (!el || el === document) return;
+  const expr = el.getAttribute('data-call');
+  if (!expr) return;
+  e.preventDefault();
+  try {
+    // 用返 call() 綁定 this＝搵到嗰粒掣／backdrop 本身，同傳返個原生 event 落去（等背景點擊
+    // 關閉彈窗嗰種 `if(event.target===this)...` 寫法可以照舊運作，同原本 onclick 屬性嘅行為一致）。
+    (new Function('event', expr)).call(el, e);
+  } catch (err) {
+    try { console.error('[HKSBC] action failed:', expr, err); } catch (e2) {}
+    renderErrorFallback(err);
+    return;
+  }
+  // 有彈窗開緊嗰陣（輸入密碼、confirm、alert），彈窗自己已經負責 render()＋focus 輸入欄，
+  // 呢度如果照樣再 render() 多一次，會將啱啱 focus 咗嘅輸入欄整個換走，搞到個游標「跌咗出嚟」。
+  if (ui.dialog) return;
+  try { render(); } catch (err) {}
+}, false);
+// 全域錯誤攔截：之前 render() 本身已經有 try/catch 保護（畫面重畫失敗時會顯示錯誤畫面），
+// 但好多動作（例如撳「呢隊勝出」入面嘅 dialogYes() → recordResult()、撳「完結此場」嘅
+// closeCourt()）係喺 render() 之前、資料仲未完全處理完嗰陣就可能中途擲出錯誤——呢種錯誤
+// 唔會行到 render() 入面嗰個 try/catch，會變成「完全冇反應」（用戶睇落好似撳咗等於冇撳），
+// 但其實已經有一個未被截住嘅 JS 錯誤，淨係冇顯示出嚟。而家加返一個 window 層面嘅全域
+// error／unhandledrejection 監聽，一旦有任何冇被截住嘅錯誤，即刻用返 renderErrorFallback()
+// 將錯誤內容直接顯示喺畫面度，等使用者可以截圖俾開發者，唔會再見到「撳咗但乜都冇發生」。
+try {
+  window.addEventListener('error', function (e) {
+    try {
+      renderErrorFallback((e && e.error) || (e && e.message) || e);
+    } catch (e2) {}
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    try {
+      renderErrorFallback((e && e.reason) || e);
+    } catch (e2) {}
+  });
+} catch (e) {}
+// 註冊離線快取（只有喺自行架設嘅網站，例如 GitHub Pages，先搵得到 service-worker.js；
+// 喺 Claude Artifact 入面攞唔到就靜靜地失敗，唔影響網上版正常運作）。
+try {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  }
+} catch (e) {}
+</script>
+</body>
+</html>
